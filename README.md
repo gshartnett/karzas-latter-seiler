@@ -3,11 +3,13 @@
 ## Introduction
 This repository contains Python code for modeling the early (E1) phase of a high-altitude electromagnetic pulse (EMP). The EMP is modeled using a variant of the well-known [Karzas-Latter model](https://journals.aps.org/pr/abstract/10.1103/PhysRev.137.B1369) introduced by [Seiler](https://apps.dtic.mil/sti/citations/ADA009208). The code may be used to produce the characteristic "smile diagrams", which depict the peak intensity of the electric field over the surface of the Earth. The diagram below corresponds to a blast detonated 100 km directly overhead Topeka, Kansas.
 
-<img src="figures/Topeka_smile.png" alt="Topeka" width="1000"/>
+<img src="Topeka_smile.png" alt="Topeka" width="1000"/>
 
 ## Contents
 The key contents of this repository are:
 - `emp.py`: a Python script containing the EMP model class, as well as other useful functions.
+- `geometry.py`: a Python script containing many useful geometrical helpful functions
+- `constants.py`: a Python script containing constants of nature and default model parameters.
 - `region_scan.py`: a Python script containing a function used to perform a 2d scan over latitude and longitude coordinates and generate the famous "smile diagrams", such as the one above.
 - `EMP Notebook.ipynb` a Jupyter notebook which walks through the math and implementation of the model
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
