@@ -158,6 +158,7 @@ def region_scan(
 
     ## perform the scan over location
     for i in tqdm(range(len(phi_T_g_list))):
+
         for j in tqdm(range(len(lambd_T_g_list)), leave=bool(i==len(phi_T_g_list)-1)):
 
             ## update target coords
@@ -165,8 +166,17 @@ def region_scan(
             lambd_T_g = lambd_T_g_list[j]         
             emp.check_geo_coords(phi_T_g, lambd_T_g)
             phi_T_m, _ = emp.geo2mag(phi_T_g, lambd_T_g)
-            
+
+            ## get B-field evaluation point
+            r_midway, phi_midway_g, lambd_midway_g = emp.get_latlong_midway(HOB, phi_B_g, lambd_B_g, phi_T_g, lambd_T_g)
+            phi_midway_m, _ = emp.geo2mag(phi_midway_g, lambd_midway_g)
+    
             try:
+                ## line of sight check
+                r_B = emp.EARTH_RADIUS + HOB
+                r_T = emp.EARTH_RADIUS
+                emp.line_of_sight_check(r_T, phi_T_g, lambd_T_g, r_B, phi_B_g, lambd_B_g)
+
                 ## define new EMP model and solve it
                 model = emp.EMPMODEL(
                     HOB = HOB,
@@ -177,14 +187,15 @@ def region_scan(
                     pulse_param_b = pulse_param_b,
                     rtol = rtol,
                     A = emp.A_angle_latlong(HOB, phi_B_g, lambd_B_g, phi_T_g, lambd_T_g), 
-                    theta = emp.theta_angle(HOB, phi_B_g, lambd_B_g, phi_T_g, lambd_T_g, B_eval_point='T'),
-                    B = emp.B0 * np.sqrt(1 + 3*np.sin(phi_T_m)**2) #dipole B-field magnitude at target
+                    theta = emp.theta_angle(HOB, phi_B_g, lambd_B_g, r_midway, phi_midway_g, lambd_midway_g),
+                    B = emp.B0 * np.sqrt(1 + 3*np.sin(phi_midway_m)**2) #dipole B-field magnitude at eval point
                     )
                 sol = model.solver(time_list)
                 data_dic['theta'][i,j] = model.theta
                 data_dic['A'][i,j] = model.A
     
             except:
+                #print('overshot LOS')
                 data_dic['theta'][i,j] = None
                 data_dic['A'][i,j] = None
                 sol = {
@@ -196,8 +207,6 @@ def region_scan(
             ## store results
             data_dic['phi_T_g'][i,j] = phi_T_g
             data_dic['lamb_T_g'][i,j] = lambd_T_g
-            #data_dic['theta'][i,j] = model.theta
-            #data_dic['A'][i,j] = model.A
             data_dic['max_E_norm_at_ground'][i,j] = np.max(sol['E_norm_at_ground'])
             data_dic['max_E_theta_at_ground'][i,j] = np.max(np.abs(sol['E_theta_at_ground']))
             data_dic['max_E_phi_at_ground'][i,j] = np.max(np.abs(sol['E_phi_at_ground']))

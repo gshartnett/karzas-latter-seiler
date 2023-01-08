@@ -110,92 +110,11 @@ def great_circle_distance(phi_1, lambd_1, phi_2, lambd_2):
     return EARTH_RADIUS * c
 
 
-def maxSizeSquareSubMatrixWithAllOnes(matrix):
-    '''
-    DELETE!
-    A helper function that finds the size of the largest square sub-matrix
-    of all 1's for an input matrix.
-    Taken from: https://iq.opengenus.org/maximum-size-square-submatrix-with-all-1s/
-    '''
-    rows,cols=len(matrix),len(matrix[0])
-    res=0
-    #function to check if a given position is valid
-    def isValidPos(i,j):
-        if i<0 or j<0 or i>=rows or j>=cols:
-            return False
-        return True
-    def helper(i,j):
-        if isValidPos(i,j)==False or matrix[i][j]==0:#if the position is not valid or the cell value is 0 nothing can be built from it
-            return 0
-        return 1+min(helper(i+1,j+1),min(helper(i+1,j),helper(i,j+1)))#recurrence relation
-    for i in range(rows):
-        for j in range(cols):
-            res=max(res,helper(i,j))#for each cell in the matrix calculate the largest square submatrix with all ones with it as the top-left corner
-    return res
-
-
-def find_indices_of_submatrix_of_ones(mat):
-    '''
-    DELETE!
-    Retrieves the slicing indices of the largest square sub-matrix
-    of all 1's for an input matrix.
-    '''
-    n = maxSizeSquareSubMatrixWithAllOnes(mat)
-    for i in range(mat.shape[0]):
-        for j in range(mat.shape[1]):
-            if np.array_equal(mat[i:i+n,j:j+n], np.ones((n,n))):
-                return i, i+n, j, j+n
-            
-            
-def get_max_target_coordinates(HOB, phi_B, lambd_B):
-    '''
-    DELETE!    
-    This is a rather crude approach to ensure that the grid scan over
-    lat/long coordinates of the target point are always within the 
-    horizon. 
-
-    First, generate a grid of angles. Then check to see which are
-    allowable. By marking each index as allowable/not-allowable, we
-    obtain a binary matrix. Then, use the above functions to find the
-    largest sub-matrix of all 1's - corresponding to the smallest 
-    square grid where all points are allowable. 
-
-    Surely there is a better way to do this...
-    '''
-    ## build the search grid
-    phi_T_list = phi_B + np.linspace(-15, 15, 30) * np.pi/180
-    phi_T_list = np.clip(phi_T_list, -np.pi/2, np.pi/2)
-    lambd_T_list = lambd_B + np.linspace(-15, 15, 30) * np.pi/180
-    lambd_T_list = np.clip(lambd_T_list, -np.pi, np.pi)
-    
-    ## perform the scan
-    check_matrix = np.zeros((len(phi_T_list), len(lambd_T_list)))
-    for i, phi_T in enumerate(phi_T_list):
-        for j, lambd_T in enumerate(lambd_T_list):
-            try:
-                XBT = get_X_BT(HOB, phi_B, lambd_B, phi_T, lambd_T)
-                check_matrix[i,j] = 1
-            except:
-                pass
-    
-    ## find the indices of the largest square submatrix of valid coordinate indices
-    i_min, i_max, j_min, j_max = find_indices_of_submatrix_of_ones(check_matrix)
-
-    ## collect the results
-    result = {
-        'phi_T_min':phi_T_list[i_min],
-        'phi_T_max':phi_T_list[i_max],
-        'lambd_T_min':lambd_T_list[j_min],
-        'lambd_T_max':lambd_T_list[j_max],
-        }
-
-    return result
-
 def compute_max_delta_angle_1d(HOB, phi_B, lambd_B, Delta_angle=25*np.pi/180, N_pts=150):
     '''
     Compute the largest delta angle such that a 1d grid
     of lat points deviating from the burst point by at
-    most delta angle radians will be entirely contained within
+    most Delta_angle radians will be entirely contained within
     the line-of-sight cone of the burst point.
     '''
     ## perform the scan over location
@@ -208,7 +127,9 @@ def compute_max_delta_angle_1d(HOB, phi_B, lambd_B, Delta_angle=25*np.pi/180, N_
         ## perform the scan over location
         try:
             for i in range(len(phi_T_list)):
-                get_X_BT(HOB, phi_B, lambd_B, phi_T_list[i], lambd_B)
+                r_T = EARTH_RADIUS
+                r_B = EARTH_RADIUS + HOB
+                line_of_sight_check(r_T, phi_T_list[i], lambd_B, r_B, phi_B, lambd_B)
             cond = True
             return Delta_angle
         except:
@@ -218,9 +139,9 @@ def compute_max_delta_angle_1d(HOB, phi_B, lambd_B, Delta_angle=25*np.pi/180, N_
 
 def compute_max_delta_angle_2d(HOB, phi_B, lambd_B, Delta_angle=25*np.pi/180, N_pts=150):
     '''
-    Compute the largest delta angle such that a 2d square grid
+    Compute the largest Delta_angle such that a 2d square grid
     of lat/long points deviating from the burst point by at
-    most delta angle radians will be entirely contained within
+    most Delta_angle radians will be entirely contained within
     the line-of-sight cone of the burst point.
     '''
     ## perform the scan over location
@@ -235,7 +156,9 @@ def compute_max_delta_angle_2d(HOB, phi_B, lambd_B, Delta_angle=25*np.pi/180, N_
         try:
             for i in range(len(phi_T_list)):
                 for j in range(len(lambd_T_list)):
-                    get_X_B(HOB, phi_B, lambd_B, phi_T_list[i], lambd_T_list[j])
+                    r_T = EARTH_RADIUS
+                    r_B = EARTH_RADIUS + HOB
+                    line_of_sight_check(r_T, phi_T_list[i], lambd_T_list[j], r_B, phi_B, lambd_B)
             cond = True
             return Delta_angle
         except:
@@ -275,7 +198,7 @@ def get_inclination_angle(phi_m, lambd_m):
 
 def get_geomagnetic_field_Cartesian(r_m, phi_m, lambd_m):
     '''
-    Returns the geomagnetic field vector in geographic Cartesian coordinates,
+    Returns the geomagnetic field vector in *geographic* Cartesian coordinates,
     for the point (r, phi, lambd) in magnetic lat/long coordinates.
     '''
     B_r_m, B_phi_m, B_lambd_m = get_geomagnetic_field(r_m, phi_m, lambd_m)
@@ -299,60 +222,64 @@ def get_geomagnetic_field_Cartesian(r_m, phi_m, lambd_m):
     return B_vec_g
 
 
-def theta_angle(HOB, phi_B_g, lambd_B_g, phi_S_g, lambd_S_g):
+def theta_angle(HOB, phi_B_g, lambd_B_g, r_S, phi_S_g, lambd_S_g):
     '''
     The angle b/w the line of sight radial vector and the local magnetic field.
     The two sets of coordinates are:
         B: burst
         S: evaluation point
+    The evaluation point could be a point on the Earth's surface, but it seems more
+    appropriate to pick a point lying in the absorption zone.
     The same geographic lat/long (r,phi,lambda) coordinate system is used for all points.
     '''
-    ## convert to magnetic coordinates for the burst point B
-    phi_B_m, lambd_B_m = geo2mag(phi_B_g, lambd_B_g)
-
     ## convert to magnetic coordinates for the evaluation point S
-    phi_S_m, lambd_S_m = geo2mag(phi_S_g, lambd_S_g)
+    phi_S_m, lambd_S_m = geo2mag(phi_S_g, lambd_S_g)   
 
     ## obtain the magnetic field vector at the evaluation point S
-    B_vec_g = get_geomagnetic_field_Cartesian(EARTH_RADIUS, phi_S_m, lambd_S_m)
+    B_vec_g = get_geomagnetic_field_Cartesian(r_S, phi_S_m, lambd_S_m)
 
-    ## get the xBS vector (points from B to S)
-    X_BS_g = get_X_BT(HOB, phi_B_g, lambd_B_g, phi_S_g, lambd_S_g)
+    ## get vector pointing from B to S
+    r_B = EARTH_RADIUS + HOB
+    X_BS_g = get_X_A_to_B(r_B, phi_B_g, lambd_B_g, r_S, phi_S_g, lambd_S_g)
     
     return np.arccos( np.dot(X_BS_g, B_vec_g) / (np.linalg.norm(X_BS_g) * np.linalg.norm(B_vec_g)) )
 
 
-def get_X_T(phi_T, lambd_T):
-    '''Get the Cartesian vectors for T'''
-    x_T, y_T, z_T = geo2cartesian(1, phi_T, lambd_T)
-    X_T = EARTH_RADIUS * np.asarray([x_T, y_T, z_T])
-    return X_T
-
-
-def get_X_B(HOB, phi_B, lambd_B):
-    '''Get the Cartesian vectors for B'''
-    x_B, y_B, z_B = geo2cartesian(1, phi_B, lambd_B)
-    X_B = (HOB + EARTH_RADIUS) * np.asarray([x_B, y_B, z_B])
-    return X_B
+def get_X_at_point(r, phi, lambd):
+    '''Get the Cartesian vectors for a point'''
+    x, y, z = geo2cartesian(1, phi, lambd)
+    X = r * np.asarray([x, y, z])
+    return X
         
     
-def get_X_BT(HOB, phi_B, lambd_B, phi_T, lambd_T):
+def get_X_A_to_B(r_A, phi_A, lambd_A, r_B, phi_B, lambd_B):
     '''
-    Given the latitude and longitude for the burst and target points,
-    compute the vector pointing from B to T.
+    Compute the vector pointing from A to B.
     '''
-    X_B = get_X_B(HOB, phi_B, lambd_B)
-    X_T = get_X_T(phi_T, lambd_T)
-    
-    ## get the xBT vector and check that we haven't overshot the horizon
-    XBT = X_T - X_B
+    X_A = get_X_at_point(r_A, phi_A, lambd_A)
+    X_B = get_X_at_point(r_B, phi_B, lambd_B)    
+    X_A_to_B = X_B - X_A
+    return X_A_to_B
+
+
+def line_of_sight_check(r_A, phi_A, lambd_A, r_B, phi_B, lambd_B):
+    '''
+    Given a burst point B and an arbitrary point A on the Earth's surface, 
+    compute the vector pointing from B to A and confirm that this vector's 
+    length is less than the length of the tangent vector pointing from B 
+    to a point on the surface.
+    '''
+    HOB = r_B - EARTH_RADIUS
     Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + HOB) )    
-    #print('|XBT| = %.2f, H/cos(Amax) = %.2f' %(np.linalg.norm(XBT), HOB / np.cos(Amax)))
-    #try:
-    #    assert np.linalg.norm(XBT) <= HOB / np.cos(Amax)
-    #except:
-    #    raise ValueError('Coordinates have overshot the horizon!')
-    return XBT
+    X_B_to_A = get_X_A_to_B(r_B, phi_B, lambd_B, r_A, phi_A, lambd_A)
+    r = np.linalg.norm(X_B_to_A) # distance from B to surface point A
+    rmax = (EARTH_RADIUS + HOB) * np.cos(Amax)
+    try:
+        assert r <= rmax
+        #assert r <= HOB / np.cos(Amax) # i think this is wrong! DELETE
+    except: 
+        raise ValueError('Coordinates have overshot the horizon!')
+    return
 
     
 def A_angle_spherical(HOB, theta_B, phi_B, theta_T, phi_T):
@@ -374,13 +301,16 @@ def A_angle_dotproduct(HOB, phi_B, lambd_B, phi_T, lambd_T):
     Computed directly from the dot product formula.
     '''
     ## get the Cartesian vectors for B
+    r_B = HOB + EARTH_RADIUS
     x_B, y_B, z_B = geo2cartesian(1, phi_B, lambd_B)
-    X_B = (HOB + EARTH_RADIUS) * np.asarray([x_B, y_B, z_B])
+    X_B = r_B * np.asarray([x_B, y_B, z_B])
 
-    ## get the Cartesian vector for XBT
-    X_BT = get_X_BT(HOB, phi_B, lambd_B, phi_T, lambd_T)
-    
-    return np.arccos( - np.dot(X_BT, X_B) / (np.linalg.norm(X_BT) * np.linalg.norm(X_B)) )
+    ## get the Cartesian vector for X_B_to_T
+    r_T = EARTH_RADIUS
+    X_B_to_T = get_X_A_to_B(r_B, phi_B, lambd_B, r_T, phi_T, lambd_T)
+
+    ## compute A. The - sign comes from the fact that X_B = vector from origin to B, but we want B to origin    
+    return np.arccos( - np.dot(X_B_to_T, X_B) / (np.linalg.norm(X_B_to_T) * np.linalg.norm(X_B)) )
     
     
 def A_angle_latlong(HOB, phi_B, lambd_B, phi_T, lambd_T):
@@ -399,27 +329,32 @@ def get_X_midway(HOB, phi_B, lambd_B, phi_T, lambd_T):
     '''
     Get the position vector to a point mid-way between the 
     upper and lower absorption layers, along the line of sight ray.
-    Label this point S, we have:
-    x_S = (1-s) X_B + s X_T,
-    s can be solved for using the fact that |X_BS| = (rmax-rmin)/2.
     '''
     A = A_angle_latlong(HOB, phi_B, lambd_B, phi_T, lambd_T)
     rmin = (HOB - ABSORPTION_LAYER_UPPER) / np.cos(A) #distance from burst point (r=0) to top of absorption layer
     rmax = (HOB - ABSORPTION_LAYER_LOWER) / np.cos(A) #distance from burst point (r=0) to bottom of absorption layer
-    X_BT = get_X_BT(HOB, phi_B, lambd_B, phi_T, lambd_T)
-    rT = np.linalg.norm(X_BT)
-    s = (rmax - rmin) / rT
-    return (1-s) * get_X_B(HOB, phi_B, lambd_B) + s * get_X_T(phi_T, lambd_T)
+    
+    r_B = EARTH_RADIUS + HOB    
+    r_T = EARTH_RADIUS
+    
+    ## compute the vector from B to T
+    X_B_to_T = get_X_A_to_B(r_B, phi_B, lambd_B, r_T, phi_T, lambd_T)
+    ## rescale the length to be (rmin+rmax)/2, producing X_B_to_midway
+    X_B_to_midway = ( (rmin + rmax) / 2 ) * X_B_to_T / np.linalg.norm(X_B_to_T)
+    ## get vector from origin to B
+    X_B = get_X_at_point(r_B, phi_B, lambd_B)
+    ## combine to get vector from origin to midway
+    return X_B + X_B_to_midway
 
     
 def get_latlong_midway(HOB, phi_B, lambd_B, phi_T, lambd_T):
     '''
-    Get the lat/long of the mid-way point S.
+    Get the lat/long of the mid-way point.
     '''
-    X_S = get_X_midway(HOB, phi_B, lambd_B, phi_T, lambd_T)
-    _, phi_S, lambd_S = cartesian2geo(X_S[0], X_S[1], X_S[2])
-    check_geo_coords(phi_S, lambd_S)
-    return phi_S, lambd_S
+    X_midway = get_X_midway(HOB, phi_B, lambd_B, phi_T, lambd_T)
+    r_midway, phi_midway, lambd_midway = cartesian2geo(X_midway[0], X_midway[1], X_midway[2])
+    check_geo_coords(phi_midway, lambd_midway)
+    return r_midway, phi_midway, lambd_midway
 
 
 def spherical2cartesian(r, theta, phi):
