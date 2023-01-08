@@ -3,7 +3,6 @@ Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
 '''
 
-
 ## imports
 import os
 import pickle 
@@ -17,8 +16,11 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import matplotlib
 from cycler import cycler
-import emp
 
+## my imports
+from constants import *
+import geometry
+import emp
 
 plt.rcParams['xtick.direction'] = 'in'
 plt.rcParams['ytick.direction'] = 'in'
@@ -115,20 +117,15 @@ def contour_plot(x, y, z, save_path=None, grid=False):
     return contourf
 
 
-## instantiate a default emp model to copy the default param values
-model_default = emp.EMPMODEL()   
-
-
 def region_scan(
-    phi_B_g,
-    lambd_B_g,
-    HOB = model_default.HOB,
-    Compton_KE = model_default.Compton_KE,
-    total_yield_kt = model_default.total_yield_kt,
-    gamma_yield_fraction = model_default.gamma_yield_fraction,
-    pulse_param_a = model_default.pulse_param_a,
-    pulse_param_b = model_default.pulse_param_b,
-    rtol = model_default.rtol,
+    Burst_Point,
+    HOB = DEFAULT_HOB,
+    Compton_KE = DEFAULT_Compton_KE,
+    total_yield_kt = DEFAULT_total_yield_kt,
+    gamma_yield_fraction = DEFAULT_gamma_yield_fraction,
+    pulse_param_a = DEFAULT_pulse_param_a,
+    pulse_param_b = DEFAULT_pulse_param_b,
+    rtol = DEFAULT_rtol,
     N_pts_phi = 20,
     N_pts_lambd = 20,
     time_max = 100.0,
@@ -137,13 +134,11 @@ def region_scan(
 
     time_list = np.linspace(0, time_max, N_pts_time)
 
-    emp.check_geo_coords(phi_B_g, lambd_B_g)
-    
     ## angular grid
-    Delta_angle = emp.compute_max_delta_angle_2d(HOB, phi_B_g, lambd_B_g)
+    Delta_angle = geometry.compute_max_delta_angle_2d(Burst_Point)
     Delta_angle = 2.0 * Delta_angle
-    phi_T_g_list = phi_B_g + np.linspace(-Delta_angle/2, Delta_angle/2, N_pts_phi)
-    lambd_T_g_list = lambd_B_g + np.linspace(-Delta_angle/2, Delta_angle/2, N_pts_phi)
+    phi_T_g_list = Burst_Point.phi_g + np.linspace(-Delta_angle/2, Delta_angle/2, N_pts_phi)
+    lambd_T_g_list = Burst_Point.lambd_g + np.linspace(-Delta_angle/2, Delta_angle/2, N_pts_phi)
     
     ## initialize data dictionary
     data_dic = {
@@ -161,21 +156,13 @@ def region_scan(
 
         for j in tqdm(range(len(lambd_T_g_list)), leave=bool(i==len(phi_T_g_list)-1)):
 
-            ## update target coords
-            phi_T_g = phi_T_g_list[i] 
-            lambd_T_g = lambd_T_g_list[j]         
-            emp.check_geo_coords(phi_T_g, lambd_T_g)
-            phi_T_m, _ = emp.geo2mag(phi_T_g, lambd_T_g)
-
-            ## get B-field evaluation point
-            r_midway, phi_midway_g, lambd_midway_g = emp.get_latlong_midway(HOB, phi_B_g, lambd_B_g, phi_T_g, lambd_T_g)
-            phi_midway_m, _ = emp.geo2mag(phi_midway_g, lambd_midway_g)
+            ## update target and midway points
+            Target_Point = geometry.Point(EARTH_RADIUS, phi_T_g_list[i], lambd_T_g_list[j], 'lat/long geo')
+            Midway_Point = geometry.get_line_of_sight_midway_point(Burst_Point, Target_Point)
     
             try:
                 ## line of sight check
-                r_B = emp.EARTH_RADIUS + HOB
-                r_T = emp.EARTH_RADIUS
-                emp.line_of_sight_check(r_T, phi_T_g, lambd_T_g, r_B, phi_B_g, lambd_B_g)
+                geometry.line_of_sight_check(Burst_Point, Target_Point)
 
                 ## define new EMP model and solve it
                 model = emp.EMPMODEL(
@@ -186,9 +173,9 @@ def region_scan(
                     pulse_param_a = pulse_param_a,
                     pulse_param_b = pulse_param_b,
                     rtol = rtol,
-                    A = emp.A_angle_latlong(HOB, phi_B_g, lambd_B_g, phi_T_g, lambd_T_g), 
-                    theta = emp.theta_angle(HOB, phi_B_g, lambd_B_g, r_midway, phi_midway_g, lambd_midway_g),
-                    B = emp.B0 * np.sqrt(1 + 3*np.sin(phi_midway_m)**2) #dipole B-field magnitude at eval point
+                    A = geometry.get_A(Burst_Point, Midway_Point),
+                    theta = geometry.get_theta(Burst_Point, Midway_Point),
+                    B = geometry.get_geomagnetic_field_norm(Midway_Point)
                     )
                 sol = model.solver(time_list)
                 data_dic['theta'][i,j] = model.theta
@@ -205,8 +192,8 @@ def region_scan(
                         }
                     
             ## store results
-            data_dic['phi_T_g'][i,j] = phi_T_g
-            data_dic['lamb_T_g'][i,j] = lambd_T_g
+            data_dic['phi_T_g'][i,j] = Target_Point.phi_g
+            data_dic['lamb_T_g'][i,j] = Target_Point.lambd_g
             data_dic['max_E_norm_at_ground'][i,j] = np.max(sol['E_norm_at_ground'])
             data_dic['max_E_theta_at_ground'][i,j] = np.max(np.abs(sol['E_theta_at_ground']))
             data_dic['max_E_phi_at_ground'][i,j] = np.max(np.abs(sol['E_phi_at_ground']))
@@ -218,7 +205,6 @@ def region_scan(
 if __name__ == "__main__":
 
     ## argument parsing
-    model_default = emp.EMPMODEL()   
     parser = argparse.ArgumentParser(description='Compute the surface EMP intensity using the Karzas-Latter-Seiler model')
     
     parser.add_argument(
@@ -265,49 +251,49 @@ if __name__ == "__main__":
     
     parser.add_argument(
         '-HOB', 
-        default=model_default.HOB, 
+        default=DEFAULT_HOB, 
         type=float, 
         help='Height of burst [km]'
         )
 
     parser.add_argument(
         '-Compton_KE', 
-        default=model_default.Compton_KE, 
+        default=DEFAULT_Compton_KE, 
         type=float, 
         help='Kinetic energy of Compton electrons [MeV]'
         )
 
     parser.add_argument(
         '-total_yield_kt', 
-        default=model_default.total_yield_kt, 
+        default=DEFAULT_total_yield_kt, 
         type=float, 
         help='Total weapon yield [kt]'
         )
 
     parser.add_argument(
         '-gamma_yield_fraction', 
-        default=model_default.gamma_yield_fraction, 
+        default=DEFAULT_gamma_yield_fraction, 
         type=float, 
         help='Fraction of yield corresponding to prompt gamma rays'
         )
 
     parser.add_argument(
         '-pulse_param_a', 
-        default=model_default.pulse_param_a, 
+        default=DEFAULT_pulse_param_a, 
         type=float, 
         help='Pulse parameter a [ns^(-1)]'
         )
 
     parser.add_argument(
         '-pulse_param_b', 
-        default=model_default.pulse_param_b, 
+        default=DEFAULT_pulse_param_b, 
         type=float, 
         help='Pulse parameter b [ns^(-1)]'
         )
 
     parser.add_argument(
         '-rtol', 
-        default=model_default.rtol, 
+        default=DEFAULT_rtol, 
         type=float, 
         help='Relative tolerance used in the ODE integration'
         )
