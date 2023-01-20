@@ -36,28 +36,65 @@ matplotlib.rcParams['axes.prop_cycle'] = cycler(color=['#E24A33',
                                                        '#FFB5B8']
                                                 )
 
-'''
-def _warning(msg, *args, **kwargs):
-#    Monkeypatch for warnings: https://stackoverflow.com/questions/2187269/print-only-the-message-on-warnings
-    return str(msg) + '\n'
-warnings.warn = _warning
-warnings.formatwarning = custom_formatwarning
-'''
-
 
 class EMPMODEL:
+    """
+    The EMP model class.    
+    """
     def __init__(self, 
-                 total_yield_kt = DEFAULT_total_yield_kt, #total yield in kilotons
-                 gamma_yield_fraction = DEFAULT_gamma_yield_fraction, #fraction of yield deposited in prompt Gamma radiation
-                 Compton_KE = DEFAULT_Compton_KE, #kinetic energy of Compton electron in MeV
-                 HOB = DEFAULT_HOB, #heigh of burst in km
-                 B = DEFAULT_B, #geomagnetic field strength in Teslas
-                 theta = DEFAULT_theta, #angle between line of sight vector and magnetic field
-                 A = DEFAULT_A, #angle between radial ray from burst point to target and normal in radians
-                 pulse_param_a = DEFAULT_pulse_param_a, #pulse parameter in 1/ns
-                 pulse_param_b = DEFAULT_pulse_param_b, #pulse parameter in 1/ns
-                 rtol = DEFAULT_rtol # relative tolerance for ODE integration
+                 total_yield_kt = DEFAULT_total_yield_kt,
+                 gamma_yield_fraction = DEFAULT_gamma_yield_fraction,
+                 Compton_KE = DEFAULT_Compton_KE,
+                 HOB = DEFAULT_HOB,
+                 B = DEFAULT_B,
+                 theta = DEFAULT_theta,
+                 A = DEFAULT_A,
+                 pulse_param_a = DEFAULT_pulse_param_a,
+                 pulse_param_b = DEFAULT_pulse_param_b,
+                 rtol = DEFAULT_rtol
                  ):
+        """
+        Init method.
+
+        Parameters
+        ----------
+        total_yield_kt : float, optional
+            Total yield in kilotons.
+            By default DEFAULT_total_yield_kt.
+        gamma_yield_fraction : float, optional
+            Fraction of yield deposited in prompt Gamma radiation.
+            By default DEFAULT_gamma_yield_fraction.
+        Compton_KE : float, optional
+            Kinetic energy of Compton electron in MeV.
+            By default DEFAULT_Compton_KE.
+        HOB : float, optional
+            Height of burst in km.
+            By default DEFAULT_HOB.
+        B : float, optional
+            Geomagnetic field strength in Teslas.
+            By default, DEFAULT_B.
+        theta : float, optional
+            Angle between line of sight vector and magnetic field in radians.
+            By default, DEFAULT_theta.
+        A : float, optional
+            Angle between radial ray from burst point to target and normal 
+            in radians.
+            By default, DEFAULT_A.
+        pulse_param_a : float, optional
+            Pulse parameter in 1/ns.
+            By default, DEFAULT_pulse_param_a.
+        pulse_param_b : float, optional
+            Pulse parameter in 1/ns.
+            By default, DEFAULT_pulse_param_b.
+        rtol : float, optional
+            Relative tolerance for ODE integration.
+            By default, DEFAULT_rtol.
+            
+        Yields
+        ------
+        None
+            No returns.
+        """
         
         ## variable input parameters
         self.total_yield_kt = total_yield_kt
@@ -72,94 +109,207 @@ class EMPMODEL:
         self.rtol = rtol
         
         ## secondary/derivative parameters
-        self.Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + self.HOB) ) #max A angle (line of sight is tangent to horizon)
-        self.R0 = 412 * self.Compton_KE**(1.265 - 0.0954*np.log(self.Compton_KE)) / AIR_DENSITY_AT_SEA_LEVEL * 1e-2 #range of Compton electrons at sea level in m
-        self.total_yield_MeV = self.total_yield_kt * KT_TO_MEV #yield in MeV
-        self.V0 = SPEED_OF_LIGHT * np.sqrt( (self.Compton_KE**2 + 2*ELECTRON_MASS*self.Compton_KE) / (self.Compton_KE + ELECTRON_MASS)**2 ) #initial Compton velocity in m/s
-        self.beta = self.V0 / SPEED_OF_LIGHT #velocity in units of c
-        self.gamma = np.sqrt(1/(1 - self.beta**2)) #Lorentz factor
-        self.omega = ELECTRON_CHARGE * self.B / ( self.gamma * ELECTRON_MASS * MEV_TO_KG) # units of 1/s
-        self.q = self.Compton_KE / (33 * 1e-6) #number of secondary electrons
-        self.rmin = (self.HOB - ABSORPTION_LAYER_UPPER) / np.cos(self.A) #distance from burst point (r=0) to top of absorption layer
-        self.rmax = (self.HOB - ABSORPTION_LAYER_LOWER) / np.cos(self.A) #distance from burst point (r=0) to bottom of absorption layer
-        self.rtarget = self.HOB / np.cos(self.A) #distance from burst point (r=0) to bottom of absorption layer
+        # max A angle (line of sight is tangent to horizon)
+        self.Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + self.HOB) )
+
+        # range of Compton electrons at sea level in m
+        self.R0 = 412 * self.Compton_KE**(1.265 - 0.0954*np.log(self.Compton_KE)) / AIR_DENSITY_AT_SEA_LEVEL * 1e-2
+        
+        # yield in MeV
+        self.total_yield_MeV = self.total_yield_kt * KT_TO_MEV 
+
+        # initial Compton velocity in m/s
+        self.V0 = (
+            SPEED_OF_LIGHT 
+            * np.sqrt( 
+                      (self.Compton_KE**2 + 2*ELECTRON_MASS*self.Compton_KE) 
+                      / (self.Compton_KE + ELECTRON_MASS)**2 
+                      )
+            ) 
+        
+        # velocity in units of c
+        self.beta = self.V0 / SPEED_OF_LIGHT 
+        
+        # Lorentz factor
+        self.gamma = np.sqrt(1/(1 - self.beta**2)) 
+
+        # Larmor frequency in units of 1/s
+        self.omega = ELECTRON_CHARGE * self.B / ( self.gamma * ELECTRON_MASS * MEV_TO_KG) 
+        
+        # number of secondary electrons
+        self.q = self.Compton_KE / (33 * 1e-6)
+
+        # distance from burst point (r=0) to top of absorption layer in km
+        self.rmin = (self.HOB - ABSORPTION_LAYER_UPPER) / np.cos(self.A)
+
+        # distance from burst point (r=0) to bottom of absorption layer in km
+        self.rmax = (self.HOB - ABSORPTION_LAYER_LOWER) / np.cos(self.A)
+
+        # distance from burst point (r=0) to bottom of absorption layer in km
+        self.rtarget = self.HOB / np.cos(self.A) 
                 
         ## check that the angle A lies in the correct range
         assert (0 <= self.A) or (self.A >= self.Amax)
         
-        ## check that the distance to the target lies in the correct range
-        
     def RCompton(self, r):
-        '''
-        The Compton electron stopping distance, in m
-        '''
+        """
+        The Compton electron stopping distance.
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+
+        Returns
+        -------
+        float
+            Stopping distance.
+        """
         R = self.R0/self.rho_divided_by_rho0(r)
         return R
     
     def TCompton(self, r):
-        '''
-        The (scaled) Compton electron lifetime, in ns
-        '''
+        """
+        The (scaled) Compton electron lifetime.
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+
+        Returns
+        -------
+        float
+            Compton electron lifetime, in ns.
+        """
         T = 1e9 * self.RCompton(r) / self.V0
         T = min(T, 1e3) #don't let T exceed 1 μs = 10^3 ns
         T = (1-self.beta)*T
         return T
 
     def f_pulse(self, t):
-        '''
+        """
         Normalized gamma pulse.
-        Units in 1/ns
-        '''
+
+        Parameters
+        ----------
+        t : Union[float, ndarray]
+            Time, in ns.
+
+        Returns
+        -------
+        Union[float, ndarray]
+            Gamma flux pulse profile, in 1/ns.
+        """
         mask = 1.0 * (t >= 0) #if t<0, define the pulse to be zero
-        prefactor = (self.pulse_param_a * self.pulse_param_b) / (self.pulse_param_b - self.pulse_param_a)
-        out = mask * prefactor * (np.exp(-self.pulse_param_a * t) - np.exp(-self.pulse_param_b * t))
+        prefactor = (
+            (self.pulse_param_a * self.pulse_param_b)
+            / (self.pulse_param_b - self.pulse_param_a)
+        )
+        out = (
+            mask * prefactor 
+            * (
+                np.exp(-self.pulse_param_a * t) 
+                - np.exp(-self.pulse_param_b * t)
+                )
+        )
         return out
     
     def rho_divided_by_rho0(self, r):
-        '''
-        Ratio of air density at radius r to air density at sea level
-        Units are in km
-        '''
+        """
+        Ratio of air density at radius r to air density at sea level.
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+
+        Returns
+        -------
+        float
+            Air density ratio, dimensionless.
+        """
         return np.exp( -(self.HOB - r*np.cos(self.A)) / SCALE_HEIGHT )
     
     def mean_free_path(self, r):
-        '''    
-        Mean free path
-        Units (of both r and λ) are km
-        '''
+        """
+        Compton electron mean free path.
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+
+        Returns
+        -------
+        float
+           Mean free path, in km.
+        """
         return MEAN_FREE_PATH_AT_SEA_LEVEL / self.rho_divided_by_rho0(r)
     
     def gCompton(self, r):
-        '''
-        The rate function for the creation of primary electrons
-        The radius is measured from the burst
-        Units are in km^(-3)
-        '''
+        """
+        The rate function for the creation of primary electrons.
+        The radius is measured from the burst.
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+
+        Returns
+        -------
+        float
+            Compton rate function, in km^(-3)
+        """
         out = self.gamma_yield_fraction * self.total_yield_MeV / self.Compton_KE / (4 * np.pi * r**2 * self.mean_free_path(r))
         out *= np.exp( - np.exp(-self.HOB/SCALE_HEIGHT) / MEAN_FREE_PATH_AT_SEA_LEVEL * SCALE_HEIGHT / np.cos(self.A) * (np.exp(r * np.cos(self.A)/SCALE_HEIGHT) - 1))
         return out
 
     def gCompton_numerical_integration(self, r):
-        '''
+        """
         The rate function for the creation of primary electrons
         The radius is measured from the burst.
-
         Here g is computed using a numerical integration.
-        
-        To Do:
+        TO DO:
         - can we vectorize the numerical integral w/ scipy?
         - should we increase the precision?
-        '''
+        
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+
+        Returns
+        -------
+        float
+            Compton rate function, in km^(-3)
+        """
         integral = np.asarray([quad(lambda x: 1/self.mean_free_path(x), 0, ri)[0] for ri in r])
-        out = self.gamma_yield_fraction * self.total_yield_MeV / self.Compton_KE * np.exp(-integral) / (4 * np.pi * r**2 * self.mean_free_path(r))
+        out = (
+            self.gamma_yield_fraction * self.total_yield_MeV 
+            / self.Compton_KE * np.exp(-integral) / (4 * np.pi * r**2 * self.mean_free_path(r))
+        )
         return out
     
     def electron_collision_freq_at_sea_level(self, E, t):
-        '''
-        Electron collision frequency at sea level, in 1/ns.
+        """
+        Electron collision frequency at sea level.
         Defined in Seiler eq 55.
-        I modified the expression so t is in units of ns.
-        '''
+        I modified his expression so t is in units of ns.
+        
+        Parameters
+        ----------
+        E : float
+            Norm of the electric field, in V/m.
+        t : float
+            Evaluation retarded time, in ns.
+
+        Returns
+        -------
+        float
+            Electron collision frequency, in 1/ns.
+        """
         nu_1 = (-2.5 * 1e20 * 1e-9*t) + (4.5 * 1e12)
         if E < 5e4:
             nu_2 = (0.43 * 1e8)*E + (1.6 * 1e12)
@@ -170,9 +320,25 @@ class EMPMODEL:
         return 1e-9 * nu 
     
     def conductivity(self, r, t, nuC_0):
-        '''
+        """
         The conductivity computed using Seiler's approximation.
-        '''
+        Defined in Seiler eq. 67 and 70. The expression in eq. 70
+        has been simlified.
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+        nuC_0 : float
+            Ground-level electron collision frequency, in units of 1/ns.
+            
+        Returns
+        -------
+        float
+            Conductivity, in units of C^2 s m^{-3} kg^{-1}.
+        """
         T = self.TCompton(r) # integration time, as a function of r, in units of ns
         nuC = nuC_0 * self.rho_divided_by_rho0(r)
         prefactor = (ELECTRON_CHARGE**2 * self.q/ELECTRON_MASS) * self.gCompton(r)/nuC * 1/((self.pulse_param_b - self.pulse_param_a)*T)
@@ -187,10 +353,22 @@ class EMPMODEL:
         return units_conversion_factor * prefactor * main_term
     
     def JCompton_theta(self, r, t):
-        '''
-        The polar angle component of the Compton current
-        computed using Seiler's approximation
-        '''
+        """
+        The theta component of the Compton current, computed using 
+        Seiler's approximation. Defined in Seiler eq. 65 and 68. 
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+
+        Returns
+        -------
+        float
+            J_theta, in units of C s^{-1} m^{-2}.
+        """
         T = self.TCompton(r) # integration time, as a function of z, in units of ns
         prefactor = ELECTRON_CHARGE * self.gCompton(r) * np.sin(2*self.theta) * (self.omega**2/4) 
         prefactor *= self.V0/(self.pulse_param_b-self.pulse_param_a) * (1-self.beta)**(-3)
@@ -204,10 +382,22 @@ class EMPMODEL:
         return units_conversion_factor * prefactor * main_term
     
     def JCompton_phi(self, r, t):
-        '''
-        The azimuthal angle component of the Compton current
-        computed using Seiler's approximation
-        '''
+        """
+        The azimuthal component of the Compton current, computed using 
+        Seiler's approximation. Defined in Seiler eq. 66 and 69. 
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+
+        Returns
+        -------
+        float
+            J_phi, in units of C s^{-1} m^{-2}.
+        """
         T = self.TCompton(r) # integration time, as a function of z, in units of ns
         prefactor = - ELECTRON_CHARGE * self.gCompton(r) * np.sin(self.theta) * self.omega * self.V0/(self.pulse_param_b-self.pulse_param_a) * (1-self.beta)**(-2)
         if t < T:
@@ -218,11 +408,22 @@ class EMPMODEL:
         return units_conversion_factor * prefactor * main_term
 
     def JCompton_theta_KL(self, r, t):
-        '''
-        The polar angle component of the Compton current.
-        r is measured in km
-        t is measured in ns
-        '''
+        """
+        The theta component of the Compton current, computed using 
+        the KL approximation. Defined in KL eq. 15. 
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+
+        Returns
+        -------
+        float
+            J_theta, in units of C s^{-1} m^{-2}.
+        """
         int_upper_limit = self.RCompton(r) / self.V0 * 1e9 #integration upper limit (in ns)
         int_upper_limit = min(int_upper_limit, 1e3)
         omega_ns = self.omega * 1e-9 #cyclotron frequency in 1/ns
@@ -241,11 +442,22 @@ class EMPMODEL:
         return units_conversion_factor * prefactor * main_term
 
     def JCompton_phi_KL(self, r, t):
-        '''
-        The azimuthal angle component of the Compton current.
-        r is measured in km
-        t is measured in ns
-        '''
+        """
+        The phi component of the Compton current, computed using 
+        the KL approximation. Defined in KL eq. 16. 
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+
+        Returns
+        -------
+        float
+            J_phi, in units of C s^{-1} m^{-2}.
+        """
         int_upper_limit = self.RCompton(r) / self.V0 * 1e9 #integration upper limit (in ns)
         int_upper_limit = min(int_upper_limit, 1e3)
         omega_ns = self.omega * 1e-9 #cyclotron frequency in 1/ns
@@ -264,11 +476,24 @@ class EMPMODEL:
         return units_conversion_factor * prefactor * main_term
     
     def conductivity_KL(self, r, t, nuC_0):
-        '''
-        The conductivity computed using Seiler's approximation.
-        r is measured in km
-        t is measured in ns
-        '''
+        """
+        The conductivity computed using the KL approximation.
+        Defined in KL eq. 53 and 13.
+
+        Parameters
+        ----------
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+        nuC_0 : float
+            Ground-level electron collision frequency, in units of 1/ns.
+            
+        Returns
+        -------
+        float
+            Conductivity, in units of C^2 s m^{-3} kg^{-1}.            
+        """
         int_upper_limit = self.RCompton(r) / self.V0 * 1e9 #integration upper limit (in ns)
         int_upper_limit = min(int_upper_limit, 1e3)
         
@@ -290,25 +515,87 @@ class EMPMODEL:
         return units_conversion_factor * prefactor * outer_integral
 
     def F_theta_Seiler(self, E, r, t, nuC_0):
-        '''
-        The theta-component of the Maxwell equations. 
-        Expressed as dE/dr = F(E)
-        '''
-        return -E/r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (self.JCompton_theta(r, t) + self.conductivity(r, t, nuC_0(r))*E)
+        """
+        The theta-component of the Maxwell equations,
+        expressed as dE/dr = F(E).
+
+        Parameters
+        ----------
+        E : float
+            Electric field, in V/m.
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+        nuC_0 : float
+            Ground-level electron collision frequency, in units of 1/ns.
+
+        Returns
+        -------
+        float
+            Returns the RHS of the ODE. Units are in (V/m/km).
+            The factor of 1e3 is to account for the fact that r
+            is measured in km.
+        """
+        return (
+            -E/r 
+            - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) 
+            * (
+                self.JCompton_theta(r, t) 
+                + self.conductivity(r, t, nuC_0(r))*E
+                )
+            )
 
     def F_phi_Seiler(self, E, r, t, nuC_0):
-        '''
-        The theta-component of the Maxwell equations. 
-        Expressed as dE/dr = F(E)
-        '''
-        return -E/r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (self.JCompton_phi(r, t) + self.conductivity(r, t, nuC_0(r))*E)
+        """
+        The phi-component of the Maxwell equations,
+        expressed as dE/dr = F(E).
+
+        Parameters
+        ----------
+        E : float
+            Electric field, in V/m.
+        r : float
+            Radius from burst to point of interest, in km.
+        t : float
+            Evaluation retarded time, in ns.
+        nuC_0 : float
+            Ground-level electron collision frequency, in units of 1/ns.
+
+        Returns
+        -------
+        float
+            Returns the RHS of the ODE. Units are in (V/m/km).
+            The factor of 1e3 is to account for the fact that r
+            is measured in km.
+        """
+        return (
+            -E/r 
+            - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) 
+            * (
+                self.JCompton_phi(r, t) 
+                + self.conductivity(r, t, nuC_0(r))*E
+                )
+            )
 
     def ODE_solve(self, t, nuC_0):
-        '''
+        """
         Solve the angular components of the KL ODEs.
-                
-        To Do: consider adding radial component
-        '''
+        
+        TO DO: consider adding radial component
+
+        Parameters
+        ----------
+        t : float
+            Evaluation retarded time, in ns.
+        nuC_0 : float
+            Ground-level electron collision frequency, in units of 1/ns.
+
+        Returns
+        -------
+        Dict
+            A result dictionary for each component (theta, phi).
+        """
         sol_theta = solve_ivp(lambda r, e: self.F_theta_Seiler(e, r, t, nuC_0), 
                               [self.rmin, self.rmax], 
                               [0],
@@ -320,12 +607,24 @@ class EMPMODEL:
         return sol_theta, sol_phi
     
     def solver(self, tlist):
-        '''
-        Solve the KL equations for a range of retarded times and 
+        """
+        Solve the KL equations using the Seiler approximations 
+        for the source terms for a range of retarded times and 
         return the angular components of the electric field for 
         r = r_target (at the Earth's surface).
-        '''
-        
+
+        Parameters
+        ----------
+        tlist : ndarray
+            A numpy array of the list of evaluation times.
+
+        Returns
+        -------
+        Dict
+            A dictionary containing time series of the components 
+            and norm of the E-field evaluated at a target point
+            on the Earth's surface.
+        """
         out = {'tlist':tlist, 'E_theta_at_ground':[], 'E_phi_at_ground':[], 'E_norm_at_ground':[]}
         rlist = np.linspace(self.rmin, self.rmax, 200)
         #E_norm_at_rmax = 0.0

@@ -8,7 +8,7 @@ This repository contains Python code for modeling the early (E1) phase of a high
 ## Contents
 The key contents of this repository are:
 - `emp.py`: a Python script containing the EMP model class, as well as other useful functions.
-- `geometry.py`: a Python script containing many useful geometrical helpful functions
+- `geometry.py`: a Python script containing many useful geometrical helper functions
 - `constants.py`: a Python script containing constants of nature and default model parameters.
 - `region_scan.py`: a Python script containing a function used to perform a 2d scan over latitude and longitude coordinates and generate the famous "smile diagrams", such as the one above.
 - `EMP Notebook.ipynb` a Jupyter notebook which walks through the math and implementation of the model

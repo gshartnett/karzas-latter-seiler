@@ -32,16 +32,40 @@ plt.rcParams['lines.linewidth'] = 2
 plt.rc('font', family='serif',size=16)
 matplotlib.rc('text', usetex=True)
 matplotlib.rc('legend', fontsize=16)
-matplotlib.rcParams['axes.prop_cycle'] = cycler(color=['#E24A33', '#348ABD', '#988ED5', '#777777', '#FBC15E', '#8EBA42', '#FFB5B8'])
+matplotlib.rcParams['axes.prop_cycle'] = cycler(color=[
+    '#E24A33', 
+    '#348ABD', 
+    '#988ED5', 
+    '#777777', 
+    '#FBC15E', 
+    '#8EBA42', 
+    '#FFB5B8'
+    ])
 
 
 def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type='norm'):
-    '''
+    """
     Convert the data into three lists x, y, z, with
         x - latitude
         y - longitude
         z - field strength
-    '''
+
+    Parameters
+    ----------
+    data_dic : Dict
+        A dictionary containing the data.
+    gaussian_smooth : bool, optional
+        Boolean flag used to control whether Gaussian smoothing is 
+        applied. By default True
+    field_type : str, optional
+        Component of E-field to plot, can be 'norm', 'theta', or 'phi'. 
+        By default 'norm'
+
+    Returns
+    -------
+    Tupe[List[float], List[float], List[float]]
+        Returns the x,y,z lists of the extracted data.
+    """
     y = []
     x = []
     z = []
@@ -73,10 +97,31 @@ def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type='norm'):
 
 
 def contour_plot(x, y, z, save_path=None, grid=False):
-    '''
+    """
     Build a contour plot of the x, y, z data.
-    Grid interpolation is used (which I don't think is necessary?).
-    '''
+    Grid interpolation is used.
+    
+    TO DO: is the interpolation necessary?
+
+    Parameters
+    ----------
+    x : List[float]
+        A list of the x-values.
+    y : List[float]
+        A list of the y-values.
+    z : List[float]
+        A list of the z-values.
+    save_path : _type_, optional
+        Save path, by default None.
+    grid : bool, optional
+        Boolean flag used to control whether a grid should 
+        be displayed. By default False.
+
+    Returns
+    -------
+    _type_
+        A contourf object which can be used by folium.
+    """
 
     fig, ax = plt.subplots(figsize=(14,10))
 
@@ -134,6 +179,41 @@ def region_scan(
     time_max = 100.0,
     N_pts_time = 50
     ):
+    """
+    Function used to perform the 2d region scan.
+
+    Parameters
+    ----------
+    Burst_Point : Point
+        Burst point.
+    HOB : float, optional
+        Height of burst, in km, by default DEFAULT_HOB.
+    Compton_KE : float, optional
+        Compton kinetic energy, in MeV, by default DEFAULT_Compton_KE.
+    total_yield_kt : float, optional
+        Total weapon yield in kt, by default DEFAULT_total_yield_kt.
+    gamma_yield_fraction : float, optional
+        Fraction of yield invested in gamma-rays, by default DEFAULT_gamma_yield_fraction.
+    pulse_param_a : float, optional
+        Pulse parameter a in 1/ns, by default DEFAULT_pulse_param_a.
+    pulse_param_b : float, optional
+        Pulse parameter b in 1/ns, by default DEFAULT_pulse_param_b.
+    rtol : float, optional
+        Relative tolerance parameter, by default DEFAULT_rtol.
+    N_pts_phi : int, optional
+        Number of latitude grid points, by default 20.
+    N_pts_lambd : int, optional
+        Number of longitude grid points, by default 20.
+    time_max : float, optional
+        Max time for simulation in ns, by default 100.0
+    N_pts_time : int, optional
+        Number of temporal grid points, by default 50.
+
+    Returns
+    -------
+    Dict
+        A results dictionary.
+    """
 
     time_list = np.linspace(0, time_max, N_pts_time)
 
