@@ -179,8 +179,10 @@ class EMPMODEL:
         if t < T:
             main_term = (self.pulse_param_a*t - 1 + np.exp(-self.pulse_param_a*t))*(self.pulse_param_b/self.pulse_param_a) - (self.pulse_param_b*t - 1 + np.exp(-self.pulse_param_b*t))*(self.pulse_param_a/self.pulse_param_b)
         else:
-            main_term = (self.pulse_param_b/self.pulse_param_a)*(self.pulse_param_a*T - 1 + np.exp(-self.pulse_param_a*T) - (np.exp(self.pulse_param_a*T) - 1)*(np.exp(-self.pulse_param_a*t) - np.exp(-self.pulse_param_a*T)))
-            main_term -= (self.pulse_param_a/self.pulse_param_b)*(self.pulse_param_b*T - 1 + np.exp(-self.pulse_param_b*T) - (np.exp(self.pulse_param_b*T) - 1)*(np.exp(-self.pulse_param_b*t) - np.exp(-self.pulse_param_b*T)))
+#            main_term = (self.pulse_param_b/self.pulse_param_a)*(self.pulse_param_a*T - 1 + np.exp(-self.pulse_param_a*T) - (np.exp(self.pulse_param_a*T) - 1)*(np.exp(-self.pulse_param_a*t) - np.exp(-self.pulse_param_a*T)))
+#            main_term -= (self.pulse_param_a/self.pulse_param_b)*(self.pulse_param_b*T - 1 + np.exp(-self.pulse_param_b*T) - (np.exp(self.pulse_param_b*T) - 1)*(np.exp(-self.pulse_param_b*t) - np.exp(-self.pulse_param_b*T)))
+            main_term = (self.pulse_param_b/self.pulse_param_a)*(self.pulse_param_a*T + np.exp(-self.pulse_param_a*t) - np.exp(self.pulse_param_a*(T-t)))
+            main_term -= (self.pulse_param_a/self.pulse_param_b)*(self.pulse_param_b*T + np.exp(-self.pulse_param_b*t) - np.exp(self.pulse_param_b*(T-t)))
         units_conversion_factor = 1/MEV_TO_KG * (1/1000)**3 * (1e-9)
         return units_conversion_factor * prefactor * main_term
     
@@ -214,7 +216,79 @@ class EMPMODEL:
             main_term = np.exp(-self.pulse_param_a*t)*(np.exp(self.pulse_param_a*T)*(self.pulse_param_a*T - 1) + 1)*(self.pulse_param_b/self.pulse_param_a) - np.exp(-self.pulse_param_b*t)*(np.exp(self.pulse_param_b*T)*(self.pulse_param_b*T - 1) + 1)*(self.pulse_param_a/self.pulse_param_b)
         units_conversion_factor = 1e-18
         return units_conversion_factor * prefactor * main_term
+
+    def JCompton_theta_KL(self, r, t):
+        '''
+        The polar angle component of the Compton current.
+        r is measured in km
+        t is measured in ns
+        '''
+        int_upper_limit = self.RCompton(r) / self.V0 * 1e9 #integration upper limit (in ns)
+        int_upper_limit = min(int_upper_limit, 1e3)
+        omega_ns = self.omega * 1e-9 #cyclotron frequency in 1/ns
+        prefactor = - ELECTRON_CHARGE * self.V0 * self.gCompton(r) * np.sin(self.theta) * np.cos(self.theta)
+        units_conversion_factor = 1e-9
+        
+        def integrand(tau, tau_p):
+            tau_tilde = (
+                tau - (1 - self.beta * np.cos(self.theta)**2) * tau_p 
+                + self.beta * np.sin(self.theta)**2 * np.sin(omega_ns * tau_p)/omega_ns
+            )
+            out = self.f_pulse(tau_tilde) * (np.cos(omega_ns * tau_p) - 1)
+            return out 
+
+        main_term = quad( lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
+        return units_conversion_factor * prefactor * main_term
+
+    def JCompton_phi_KL(self, r, t):
+        '''
+        The azimuthal angle component of the Compton current.
+        r is measured in km
+        t is measured in ns
+        '''
+        int_upper_limit = self.RCompton(r) / self.V0 * 1e9 #integration upper limit (in ns)
+        int_upper_limit = min(int_upper_limit, 1e3)
+        omega_ns = self.omega * 1e-9 #cyclotron frequency in 1/ns
+        prefactor = - ELECTRON_CHARGE * self.V0 * self.gCompton(r) * np.sin(self.theta)
+        units_conversion_factor = 1e-9
+        
+        def integrand(tau, tau_p):
+            tau_tilde = (
+                tau - (1 - self.beta * np.cos(self.theta)**2) * tau_p 
+                + self.beta * np.sin(self.theta)**2 * np.sin(omega_ns * tau_p)/omega_ns
+            )
+            out = self.f_pulse(tau_tilde) * np.sin(omega_ns * tau_p)
+            return out 
+
+        main_term = quad( lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
+        return units_conversion_factor * prefactor * main_term
     
+    def conductivity_KL(self, r, t, nuC_0):
+        '''
+        The conductivity computed using Seiler's approximation.
+        r is measured in km
+        t is measured in ns
+        '''
+        int_upper_limit = self.RCompton(r) / self.V0 * 1e9 #integration upper limit (in ns)
+        int_upper_limit = min(int_upper_limit, 1e3)
+        
+        omega_ns = self.omega * 1e-9 #cyclotron frequency in 1/ns
+        nuC = nuC_0 * self.rho_divided_by_rho0(r)
+        prefactor = ELECTRON_CHARGE**2 * self.q/ELECTRON_MASS * self.gCompton(r) / nuC / (int_upper_limit * 1e-9)
+        units_conversion_factor = 1/MEV_TO_KG * (1/1000)**3 * 1e-18
+        
+        def integrand(tau, tau_p):
+            tau_tilde = (
+                tau - (1 - self.beta * np.cos(self.theta)**2) * tau_p 
+                + self.beta * np.sin(self.theta)**2 * np.sin(omega_ns * tau_p)/omega_ns
+            )
+            out = self.f_pulse(tau_tilde)
+            return out 
+
+        inner_integral = lambda tau: quad( lambda tau_p: integrand(tau, tau_p), 0, int_upper_limit)[0]
+        outer_integral = quad( lambda tau: inner_integral(tau), 0.0, t )[0]
+        return units_conversion_factor * prefactor * outer_integral
+
     def F_theta_Seiler(self, E, r, t, nuC_0):
         '''
         The theta-component of the Maxwell equations. 

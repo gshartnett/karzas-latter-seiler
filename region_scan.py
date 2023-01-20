@@ -78,7 +78,7 @@ def contour_plot(x, y, z, save_path=None, grid=False):
     Grid interpolation is used (which I don't think is necessary?).
     '''
 
-    fig, ax = plt.subplots(figsize=(7,5))
+    fig, ax = plt.subplots(figsize=(14,10))
 
     ## create grid values
     ngrid = 250
@@ -104,6 +104,9 @@ def contour_plot(x, y, z, save_path=None, grid=False):
     levels = [i * level_spacing for i in range(1, 1+int(np.round(np.max(zi)/level_spacing)))]
     contourf = ax.contourf(xi, yi, zi, levels=levels, cmap="RdBu_r", extend='max')
     contour1 = ax.contour(xi, yi, zi, levels=levels, linewidths=1, linestyles='-', colors='k')
+
+    ax.clabel(contour1, inline=1, fontsize=10)
+
     #ax.clabel(contour1, inline=True, fontsize=8, colors='k')
     fig.colorbar(contourf, ax=ax, label=r'$E$ [V/m]')
     ax.set_xlabel(r'$\lambda$ (longitude) [degrees]', labelpad=10)
