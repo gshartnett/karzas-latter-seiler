@@ -3,7 +3,7 @@
 ## Introduction
 This repository contains Python code for modeling the early (E1) phase of a high-altitude electromagnetic pulse (EMP). The EMP is modeled using a variant of the well-known [Karzas-Latter model](https://journals.aps.org/pr/abstract/10.1103/PhysRev.137.B1369) introduced by [Seiler](https://apps.dtic.mil/sti/citations/ADA009208). The code may be used to produce the characteristic "smile diagrams", which depict the peak intensity of the electric field over the surface of the Earth. The diagram below corresponds to a blast detonated 100 km directly overhead Topeka, Kansas.
 
-<img src="topeka_smile.png" alt="Topeka" width="1000"/>
+<img src="Topeka_smile.png" alt="Topeka" width="1000"/>
 
 ## Contents
 The key contents of this repository are:
