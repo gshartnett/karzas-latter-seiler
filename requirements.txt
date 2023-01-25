@@ -5,5 +5,6 @@ geojsoncontour==0.4.0
 matplotlib==3.5.1
 numpy==1.22.2
 pandas==1.4.1
+ppigrf==1.0.2
 scipy==1.8.0
 tqdm==4.64.1
