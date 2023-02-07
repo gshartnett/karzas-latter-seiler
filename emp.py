@@ -741,7 +741,7 @@ if __name__ == "__main__":
         Compton_KE=args['Compton_KE'],
         total_yield_kt=args['total_yield_kt'],
         gamma_yield_fraction=args['gamma_yield_fraction'],
-        B=args['B'],
+        Bnorm=args['Bnorm'],
         A=args['A'],
         theta=args['theta'],
         pulse_param_a=args['pulse_param_a'],
