@@ -51,7 +51,8 @@ class EMPMODEL:
                  A = DEFAULT_A,
                  pulse_param_a = DEFAULT_pulse_param_a,
                  pulse_param_b = DEFAULT_pulse_param_b,
-                 rtol = DEFAULT_rtol
+                 rtol = DEFAULT_rtol,
+                 method = 'Radau'
                  ):
         """
         Init method.
@@ -89,6 +90,10 @@ class EMPMODEL:
         rtol : float, optional
             Relative tolerance for ODE integration.
             By default, DEFAULT_rtol.
+        method : str, optional
+            Integration method used for solve_ivp.
+            By default, 'Radau', which is well-suited
+            for stiff problems.
 
         Yields
         ------
@@ -107,6 +112,7 @@ class EMPMODEL:
         self.pulse_param_a = pulse_param_a
         self.pulse_param_b = pulse_param_b
         self.rtol = rtol
+        self.method = method
 
         ## secondary/derivative parameters
         # max A angle (line of sight is tangent to horizon)
@@ -183,13 +189,17 @@ class EMPMODEL:
             Compton electron lifetime, in ns.
         """
         T = 1e9 * self.RCompton(r) / self.V0
-        T = min(T, 1e3) #don't let T exceed 1 μs = 10^3 ns
+        T = min(T, 1e3) #don't let T exceed 1 micro second
         T = (1-self.beta)*T
         return T
 
     def f_pulse(self, t):
         """
-        Normalized gamma pulse.
+        Normalized gamma pulse, for the difference of exponential form
+        used by Seiler. This parameterization of the pulse profile has
+        the benefit that it allows many integrals to be analytically
+        solved. In general, other parameterizations are possible but
+        they will change the equations derived by Seiler.
 
         Parameters
         ----------
@@ -249,7 +259,8 @@ class EMPMODEL:
 
     def gCompton(self, r):
         """
-        The rate function for the creation of primary electrons.
+        The g function for the creation of primary electrons, as introduced
+        in Karzas, Latter Eq (4).
         The radius is measured from the burst.
 
         Parameters
@@ -260,7 +271,7 @@ class EMPMODEL:
         Returns
         -------
         float
-            Compton rate function, in km^(-3)
+            Compton g function, in km^(-3)
         """
         out = self.gamma_yield_fraction * self.total_yield_MeV / self.Compton_KE / (4 * np.pi * r**2 * self.mean_free_path(r))
         out *= np.exp( - np.exp(-self.HOB/SCALE_HEIGHT) / MEAN_FREE_PATH_AT_SEA_LEVEL * SCALE_HEIGHT / np.cos(self.A) * (np.exp(r * np.cos(self.A)/SCALE_HEIGHT) - 1))
@@ -268,7 +279,7 @@ class EMPMODEL:
 
     def gCompton_numerical_integration(self, r):
         """
-        The rate function for the creation of primary electrons
+        The g function for the creation of primary electrons
         The radius is measured from the burst.
         Here g is computed using a numerical integration.
         TO DO:
@@ -283,7 +294,7 @@ class EMPMODEL:
         Returns
         -------
         float
-            Compton rate function, in km^(-3)
+            Compton g function, in km^(-3)
         """
         integral = np.asarray([quad(lambda x: 1/self.mean_free_path(x), 0, ri)[0] for ri in r])
         out = (
@@ -599,10 +610,12 @@ class EMPMODEL:
         sol_theta = solve_ivp(lambda r, e: self.F_theta_Seiler(e, r, t, nuC_0),
                               [self.rmin, self.rmax],
                               [0],
+                              method=self.method,
                               rtol=self.rtol)
         sol_phi = solve_ivp(lambda r, e: self.F_phi_Seiler(e, r, t, nuC_0),
                             [self.rmin, self.rmax],
                             [0],
+                            method=self.method,
                             rtol=self.rtol)
         return sol_theta, sol_phi
 
