@@ -14,6 +14,8 @@ The key contents of this repository are:
 - `EMP Notebook.ipynb` a Jupyter notebook which walks through the math and implementation of the model
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
 
+Additionally, a technical write-up of the mathematical model and a presentation of the results of the code may be found [here](paper.pdf)
+
 ## Installation
 To clone the repository and install the required Python packages, follow these instructions. It is recommended to perform the installation within an Anaconda virtual environment, but this is not necessary.
 
