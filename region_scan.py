@@ -131,7 +131,7 @@ def contour_plot(x, y, z, Burst_Point, save_path=None, grid=False):
         A contourf object which can be used by folium.
     """
 
-    fig, ax = plt.subplots(figsize=(14,10))
+    fig, ax = plt.subplots(dpi=150, figsize=(14,10))
 
     ## create grid values
     ngrid = 300
