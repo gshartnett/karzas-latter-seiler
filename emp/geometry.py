@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 import ppigrf
 
-from constants import *
+from emp.constants import *
 
 
 def get_rotation_matrix(theta, vec_x, vec_y, vec_z):

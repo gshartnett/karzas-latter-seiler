@@ -3,9 +3,9 @@ Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
 """
 
+## imports
 import argparse
 import io
-## imports
 import os
 import pickle
 
@@ -26,10 +26,9 @@ from folium.plugins import HeatMap
 from PIL import Image
 from tqdm import tqdm
 
-import emp
-import geometry
-## my imports
-from constants import *
+import emp.geometry as geometry
+from emp.constants import *
+from emp.model import EMPMODEL
 
 plt.rcParams["xtick.direction"] = "in"
 plt.rcParams["ytick.direction"] = "in"
@@ -386,7 +385,7 @@ def region_scan(
                 # geometry.line_of_sight_check(Burst_Point, Target_Point)
 
                 ## define new EMP model and solve it
-                model = emp.EMPMODEL(
+                model = EMPMODEL(
                     HOB=HOB,
                     Compton_KE=Compton_KE,
                     total_yield_kt=total_yield_kt,
