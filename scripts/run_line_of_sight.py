@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from emp.constants import *
 from emp.model import EMPMODEL
 
-## argument parsing
+# argument parsing
 parser = argparse.ArgumentParser(
     description="Compute the surface EMP intensity using the Karzas-Latter-Seiler model"
 )
@@ -86,7 +86,7 @@ parser.add_argument(
 
 args = vars(parser.parse_args())
 
-## define the model
+# define the model
 model = EMPMODEL(
     HOB=args["HOB"],
     Compton_KE=args["Compton_KE"],
@@ -100,26 +100,26 @@ model = EMPMODEL(
     rtol=args["rtol"],
 )
 
-## print out param values
+# print out param values
 print("\nRunning with parameters\n--------------------")
 for key, value in model.__dict__.items():
     print(key, "=", value)
 print("\n")
 
-## perform the integration
+# perform the integration
 sol = model.solver(np.linspace(0, 50, 200))
 
-## create data and figure directories
+# create data and figure directories
 if not os.path.exists("data"):
     os.makedirs("data")
 if not os.path.exists("figures"):
     os.makedirs("figures")
 
-## save the result
+# save the result
 with open("data/emp_solution.pkl", "wb") as f:
     pickle.dump(sol, f)
 
-## plot the result
+# plot the result
 fig, ax = plt.subplots(1, figsize=(7, 5))
 ax.plot(
     sol["tlist"],

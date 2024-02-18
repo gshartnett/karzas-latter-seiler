@@ -5,7 +5,7 @@ See LICENSE and README.md for information on usage and licensing
 
 import numpy as np
 
-## constants of nature
+# constants of nature
 SCALE_HEIGHT = 7  # atmospheric scale height in km (the 7km comes from Seiler pg. 24, paragraph 1, I was using 10.4 previously)
 AIR_DENSITY_AT_SEA_LEVEL = 1.293  # air density in kg/m^3
 ELECTRON_MASS = 0.511  # electron rest mass in MeV
@@ -26,7 +26,7 @@ PHI_MAGNP = 86.294 * np.pi / 180  # latitude of magnetic North Pole (radians)
 LAMBDA_MAGNP = 151.948 * np.pi / 180  # longitude of magnetic North Pole (radians)
 B0 = 3.12 * 1e-5  # proportionality constant for the dipole geomagnetic field in Tesla
 
-## default parameters
+# default parameters
 DEFAULT_total_yield_kt = 5.0  # total yield in kilotons
 DEFAULT_gamma_yield_fraction = (
     0.05  # fraction of yield deposited in prompt Gamma radiation

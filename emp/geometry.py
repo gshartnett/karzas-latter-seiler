@@ -49,7 +49,7 @@ def get_rotation_matrix(theta, vec_x, vec_y, vec_z):
     return rotation_matrix
 
 
-## build the rotation matrices
+# build the rotation matrices
 ROTATION_MATRIX = get_rotation_matrix(
     np.pi / 2 - PHI_MAGNP, -np.sin(LAMBDA_MAGNP), np.cos(LAMBDA_MAGNP), 0.0
 )
@@ -93,7 +93,7 @@ class Point:
             "cartesian mag",
         ]
 
-        ## point initially defined using geographic coords
+        # point initially defined using geographic coords
         if "geo" in coordsys:
             if coordsys == "lat/long geo":
                 self.r_g, self.phi_g, self.lambd_g = coord1, coord2, coord3
@@ -105,7 +105,7 @@ class Point:
                 self.r_g, self.phi_g, self.lambd_g = cartesian2latlong(
                     self.x_g, self.y_g, self.z_g
                 )
-            ## convert to magnetic coords
+            # convert to magnetic coords
             self.r_m, self.phi_m, self.lambd_m = latlong_geo2mag(
                 self.r_g, self.phi_g, self.lambd_g
             )
@@ -113,7 +113,7 @@ class Point:
                 self.r_m, self.phi_m, self.lambd_m
             )
 
-        ## point initially defined using magnetic coords
+        # point initially defined using magnetic coords
         else:
             if coordsys == "lat/long mag":
                 self.r_m, self.phi_m, self.lambd_m = coord1, coord2, coord3
@@ -125,7 +125,7 @@ class Point:
                 self.r_m, self.phi_m, self.lambd_m = cartesian2latlong(
                     self.x_m, self.y_m, self.z_m
                 )
-            ## convert to geographic coords
+            # convert to geographic coords
             self.r_g, self.phi_g, self.lambd_g = latlong_mag2geo(
                 self.r_m, self.phi_m, self.lambd_m
             )
@@ -133,11 +133,11 @@ class Point:
                 self.r_g, self.phi_g, self.lambd_g
             )
 
-        ## check the coordinates
+        # check the coordinates
         check_latlong_coords(self.r_g, self.phi_g, self.lambd_g)
         check_latlong_coords(self.r_m, self.phi_m, self.lambd_m)
 
-        ## confirm that the coordinates are all consistent
+        # confirm that the coordinates are all consistent
         if consistency_check:
             point_latlong_geo = Point(
                 self.r_g,
@@ -163,6 +163,9 @@ class Point:
             assert are_two_points_equal(point_latlong_geo, point_cartesian_geo)
             assert are_two_points_equal(point_latlong_mag, point_cartesian_mag)
             assert are_two_points_equal(point_latlong_geo, point_latlong_mag)
+
+    def __rep__(self):
+        return f'rg={self.r_g}, phi_g={self.phi_g}, lambd_g={self.lamb_g}'
 
 
 def check_latlong_coords(r, phi, lambd):
@@ -407,7 +410,7 @@ def check_cartesian_geo(rng, num_trials=10000):
     """
     tol = 1e-10
 
-    ## check cartesian -> geo -> cartesian
+    # check cartesian -> geo -> cartesian
     for _ in range(num_trials):
         x, y, z = rng.uniform(low=-10, high=10, size=3)
         r, phi, lambd = cartesian2latlong(x, y, z)
@@ -416,7 +419,7 @@ def check_cartesian_geo(rng, num_trials=10000):
             (np.abs(x - x2) < tol) and (np.abs(y - y2) < tol) and (np.abs(z - z2) < tol)
         )
 
-    ## check geo -> cartesian -> geo
+    # check geo -> cartesian -> geo
     for _ in range(num_trials):
         r = 1
         phi = rng.uniform(-np.pi / 2, np.pi / 2)
@@ -439,7 +442,7 @@ def check_cartesian_spherical(rng, num_trials=10000):
     """
     tol = 1e-10
 
-    ## check cartesian -> spherical -> cartesian
+    # check cartesian -> spherical -> cartesian
     for _ in range(num_trials):
         x, y, z = rng.uniform(low=-10, high=10, size=3)
         r, theta, phi = cartesian2spherical(x, y, z)
@@ -448,7 +451,7 @@ def check_cartesian_spherical(rng, num_trials=10000):
             (np.abs(x - x2) < tol) and (np.abs(y - y2) < tol) and (np.abs(z - z2) < tol)
         )
 
-    ## check spherical -> cartesian -> spherical
+    # check spherical -> cartesian -> spherical
     for _ in range(num_trials):
         r = 1
         theta = rng.uniform(0, np.pi)
@@ -547,12 +550,12 @@ def get_geomagnetic_field_cartesian_dipole(point: Point):
     """
     B_r_m, B_phi_m, B_lambd_m = get_geomagnetic_field_latlong(point)
 
-    ## unit vectors used to convert from lat/long to Cartesian
+    # unit vectors used to convert from lat/long to Cartesian
     x_hat = np.asarray([1, 0, 0])
     y_hat = np.asarray([0, 1, 0])
     z_hat = np.asarray([0, 0, 1])
 
-    ## unit vectors for lat/long coordinates
+    # unit vectors for lat/long coordinates
     r_hat = (
         np.cos(point.phi_m) * np.cos(point.lambd_m) * x_hat
         + np.cos(point.phi_m) * np.sin(point.lambd_m) * y_hat
@@ -565,10 +568,10 @@ def get_geomagnetic_field_cartesian_dipole(point: Point):
     )
     lambd_hat = -np.sin(point.lambd_m) * x_hat + np.cos(point.lambd_m) * y_hat
 
-    ## build the magnetic Cartesian vector for B
+    # build the magnetic Cartesian vector for B
     B_vec_m = B_r_m * r_hat + B_phi_m * phi_hat + B_lambd_m * lambd_hat
 
-    ## convert to the geographic Cartesian vector
+    # convert to the geographic Cartesian vector
     B_vec_g = np.dot(ROTATION_MATRIX, B_vec_m)
 
     return B_vec_g
@@ -607,12 +610,12 @@ def get_geomagnetic_field_cartesian_igrf(point: Point):
     B_theta = B_theta[0]
     B_phi_azimuthal = B_phi_azimuthal[0]
 
-    ## unit vectors used to convert from (r, theta, phi)) to Cartesian
+    # unit vectors used to convert from (r, theta, phi)) to Cartesian
     x_hat = np.asarray([1, 0, 0])
     y_hat = np.asarray([0, 1, 0])
     z_hat = np.asarray([0, 0, 1])
 
-    ## unit vectors for lat/long coordinates
+    # unit vectors for lat/long coordinates
     r_hat = (
         np.sin(theta) * np.cos(phi_azimuthal) * x_hat
         + np.sin(theta) * np.sin(phi_azimuthal) * y_hat
@@ -627,7 +630,7 @@ def get_geomagnetic_field_cartesian_igrf(point: Point):
 
     phi_azimuthal_hat = -np.sin(phi_azimuthal) * x_hat + np.cos(phi_azimuthal) * y_hat
 
-    ## build the magnetic Cartesian vector for B
+    # build the magnetic Cartesian vector for B
     B_vec_g = B_r * r_hat + B_theta * theta_hat + B_phi_azimuthal * phi_azimuthal_hat
 
     return 1e-9 * B_vec_g  # convert to Teslas
@@ -755,7 +758,7 @@ def get_A(point_b: Point, point_s: Point):
     xvec_g_from_B_to_S = get_xvec_g_from_A_to_B(point_b, point_s)
     num = -1.0 * np.dot(xvec_g_from_B_to_S, xvec_g_from_O_to_B)
     den = np.linalg.norm(xvec_g_from_B_to_S) * np.linalg.norm(xvec_g_from_O_to_B)
-    ## A = 0 sometimes fails due to rounding errors in the coord conversions
+    # A = 0 sometimes fails due to rounding errors in the coord conversions
     if num / den > 1 and num / den < 1 + 1e-5:
         return 0
     return np.arccos(num / den)
@@ -785,27 +788,27 @@ def get_line_of_sight_midway_point(point_b: Point, point_t: Point):
         - EARTH_RADIUS
     )
 
-    ## distance from burst point (r=0) to top of absorption layer
+    # distance from burst point (r=0) to top of absorption layer
     rmin = (HOB - ABSORPTION_LAYER_UPPER) / np.cos(A)
 
-    ## distance from burst point (r=0) to bottom of absorption layer
+    # distance from burst point (r=0) to bottom of absorption layer
     rmax = (HOB - ABSORPTION_LAYER_LOWER) / np.cos(A)
 
-    ## compute the vector from B to T
+    # compute the vector from B to T
     xvec_g_from_B_to_T = get_xvec_g_from_A_to_B(point_b, point_t)
 
-    ## rescale the length to be (rmin+rmax)/2, producing X_B_to_midway
+    # rescale the length to be (rmin+rmax)/2, producing X_B_to_midway
     xvec_g_from_B_to_M = (
         ((rmin + rmax) / 2) * xvec_g_from_B_to_T / np.linalg.norm(xvec_g_from_B_to_T)
     )
 
-    ## compute the vector from O to B
+    # compute the vector from O to B
     xvec_g_from_O_to_B = np.asarray([point_b.x_g, point_b.y_g, point_b.z_g])
 
-    ## compute the vector from O to M
+    # compute the vector from O to M
     xvec_g_from_O_to_M = xvec_g_from_O_to_B + xvec_g_from_B_to_M
 
-    ## compute the midway point M
+    # compute the midway point M
     M = Point(
         xvec_g_from_O_to_M[0],
         xvec_g_from_O_to_M[1],
@@ -842,9 +845,9 @@ def line_of_sight_check(pointB: Point, pointT: Point):
     rmax = (EARTH_RADIUS + HOB) * np.cos(Amax)
     xvec_g_B_to_T = get_xvec_g_from_A_to_B(pointB, pointT)
     try:
-        ## check distance to target
+        # check distance to target
         assert np.linalg.norm(xvec_g_B_to_T) <= rmax
-        ## check angle A
+        # check angle A
         Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + HOB))
         A = get_A(pointB, pointT)
         assert 0 <= A and A <= Amax
@@ -875,22 +878,22 @@ def compute_max_delta_angle_1d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pt
     float
         A delta latitude, in radians.
     """
-    ## perform the scan over location
+    # perform the scan over location
     while Delta_angle > 1e-3:
-        ## build the angular grid and scan
+        # build the angular grid and scan
         phi_T_list = pointB.phi_g + np.linspace(
             -Delta_angle / 2, Delta_angle / 2, N_pts
         )
         try:
             for i in range(len(phi_T_list)):
-                ## check whether the target point is within the line of sight
+                # check whether the target point is within the line of sight
                 pointT = Point(
                     EARTH_RADIUS, phi_T_list[i], pointB.lambd_g, coordsys="lat/long geo"
                 )
                 line_of_sight_check(pointB, pointT)
             return Delta_angle
         except:
-            ## decay the delta angle
+            # decay the delta angle
             Delta_angle = 0.95 * Delta_angle
 
 
@@ -916,9 +919,9 @@ def compute_max_delta_angle_2d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pt
     float
         A delta angle (used for both lat and long), in radians.
     """
-    ## perform the scan over location
+    # perform the scan over location
     while Delta_angle > 1e-3:
-        ## build the angular grid and scan
+        # build the angular grid and scan
         phi_T_list = pointB.phi_g + np.linspace(
             -Delta_angle / 2, Delta_angle / 2, N_pts
         )
@@ -937,5 +940,5 @@ def compute_max_delta_angle_2d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pt
                     line_of_sight_check(pointB, pointT)
             return Delta_angle
         except:
-            ## decay the delta angle
+            # decay the delta angle
             Delta_angle = 0.95 * Delta_angle

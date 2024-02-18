@@ -3,13 +3,13 @@ Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
 """
 
-## imports
+# imports
 import argparse
 import os
 import pickle
 import warnings
 
-## plotting settings
+# plotting settings
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -101,7 +101,7 @@ class EMPMODEL:
             No returns.
         """
 
-        ## variable input parameters
+        # variable input parameters
         self.total_yield_kt = total_yield_kt
         self.gamma_yield_fraction = gamma_yield_fraction
         self.Compton_KE = Compton_KE
@@ -114,7 +114,7 @@ class EMPMODEL:
         self.rtol = rtol
         self.method = method
 
-        ## secondary/derivative parameters
+        # secondary/derivative parameters
         # max A angle (line of sight is tangent to horizon)
         self.Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + self.HOB))
 
@@ -158,7 +158,7 @@ class EMPMODEL:
         # distance from burst point (r=0) to bottom of absorption layer in km
         self.rtarget = self.HOB / np.cos(self.A)
 
-        ## check that the angle A lies in the correct range
+        # check that the angle A lies in the correct range
         assert (0 <= self.A) or (self.A >= self.Amax)
 
     def RCompton(self, r):
@@ -770,7 +770,7 @@ class EMPMODEL:
         E_norm_interp = lambda x: 0.0
 
         for t in tlist:
-            ## compute the electron collision freq.
+            # compute the electron collision freq.
             # nuC_0 = self.electron_collision_freq_at_sea_level(E_norm_at_rmax * self.rmax/self.rtarget, t)
             nuC_0_points = np.asarray(
                 [
@@ -780,17 +780,17 @@ class EMPMODEL:
             )
             nuC_0 = lambda x: np.interp(x, rlist, nuC_0_points)
 
-            ## solve the KL equations
+            # solve the KL equations
             sol_theta, sol_phi = self.ODE_solve(t, nuC_0)
 
-            ## build an interpolation of E_norm(r)
+            # build an interpolation of E_norm(r)
             E_theta_interp = lambda x: np.interp(x, sol_theta.t, sol_theta.y[0])
             E_phi_interp = lambda x: np.interp(x, sol_phi.t, sol_phi.y[0])
             E_norm_interp = lambda x: np.sqrt(
                 E_theta_interp(x) ** 2 + E_phi_interp(x) ** 2
             )
 
-            ## record the value at rmax
+            # record the value at rmax
             out["E_theta_at_ground"].append(
                 sol_theta.y[0, -1] * self.rmax / self.rtarget
             )
@@ -801,7 +801,7 @@ class EMPMODEL:
                 / self.rtarget
             )
 
-        ## check that the time of max EMP intensity is not the last time considered
+        # check that the time of max EMP intensity is not the last time considered
         i_max = max(
             np.argmax(np.abs(out["E_theta_at_ground"])),
             np.argmax(np.abs(out["E_phi_at_ground"])),
