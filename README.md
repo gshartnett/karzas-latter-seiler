@@ -32,8 +32,6 @@ cd karzas-latter-seiler
 poetry install
 ```
 
-In order to save the map images like the one pictured above, the Selenium Gecko driver must be added to the path. This can be done by following the instructions [here](https://stackoverflow.com/questions/40208051/selenium-using-python-geckodriver-executable-needs-to-be-in-path).
-
 ## Example Usage
 The `EMP Notebook.ipynb` provides an introduction to the code usage. Additionally, the following commands may be run from the terminal:
 - `python scripts/run_model.py` (solves the model for a range of times and a single target point)
