@@ -164,8 +164,8 @@ class Point:
             assert are_two_points_equal(point_latlong_mag, point_cartesian_mag)
             assert are_two_points_equal(point_latlong_geo, point_latlong_mag)
 
-    def __rep__(self):
-        return f'rg={self.r_g}, phi_g={self.phi_g}, lambd_g={self.lamb_g}'
+    def __str__(self):
+        return f'Point(rg={self.r_g}, phi_g={self.phi_g:.4f}, lambd_g={self.lambd_g:.4f})'
 
 
 def check_latlong_coords(r, phi, lambd):
@@ -280,7 +280,7 @@ def cartesian2latlong(x, y, z):
     """
     Convert Cartesian coordinates (x,y,z) to lat/long coordinates
     (r,ϕ,λ). The choice of a pi offset for y <= 0, as opposed to 2*pi,
-    corresponds to lambda \in [-pi, pi].
+    corresponds to lambda in [-pi, pi].
 
     Parameters
     ----------
