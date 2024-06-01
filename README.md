@@ -14,7 +14,7 @@ The repository is organized as follows:
     - `emp/region_scan.py`: contains code for scanning over a range of target points and creating the "smile" diagrams
     - `emp/HOB_yield_scan.py`: contains code for scanning over a range of height of burst (HOB) values and yields
 - `scripts/` contains Python scripts used to run the model in various use cases
-    - `scripts/run_model.py`: perform a single line of sight integration
+    - `scripts/run_line_of_sight.py`: perform a single line of sight integration
     - `scripts/run_region_scan.py`: perform a 2d scan over latitude and longitude coordinates and make the "smile" diagram
     - `scripts/run_HOB_yield_scan.py`: perform a scan over the height of burst (HOB) and yield
 - `notebooks/` contains a Jupyter notebook used to illustrate how to use the code 
@@ -34,7 +34,7 @@ poetry install
 
 ## Example Usage
 The `EMP Notebook.ipynb` provides an introduction to the code usage. Additionally, the following commands may be run from the terminal:
-- `python scripts/run_model.py` (solves the model for a range of times and a single target point)
+- `python scripts/run_line_of_sight.py` (solves the model for a range of times and a single target point)
 
 ## License
 This code is Copyright (C) 2023 RAND Corporation, and provided under the MIT license. See `LICENSE` for more information.
