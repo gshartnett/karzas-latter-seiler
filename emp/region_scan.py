@@ -228,7 +228,7 @@ def folium_plot(contourf, lat0, long0, levels, save_path):
 
     # set up color map
     # cmap = plt.cm.get_cmap('Spectral')
-    cmap = plt.cm.get_cmap("RdBu_r")
+    cmap = plt.colormaps.get_cmap("RdBu_r")
     colors = [cmap(x) for x in np.linspace(0, 1, len(levels))]
     cm = branca.colormap.LinearColormap(
         colors, vmin=np.min(levels), vmax=np.max(levels)

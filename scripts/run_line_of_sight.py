@@ -84,6 +84,13 @@ parser.add_argument(
     help="Relative tolerance used in the ODE integration",
 )
 
+parser.add_argument(
+    "-run_id",
+    default="",
+    type=str,
+    help="Optional string to append to the names of generated files",
+)
+
 args = vars(parser.parse_args())
 
 # define the model
@@ -99,6 +106,8 @@ model = EMPMODEL(
     pulse_param_b=args["pulse_param_b"],
     rtol=args["rtol"],
 )
+
+run_id = args["run_id"]
 
 # print out param values
 print("\nRunning with parameters\n--------------------")
@@ -116,7 +125,7 @@ if not os.path.exists("figures"):
     os.makedirs("figures")
 
 # save the result
-with open("data/emp_solution.pkl", "wb") as f:
+with open(f"data/emp_solution{run_id}.pkl", "wb") as f:
     pickle.dump(sol, f)
 
 # plot the result
@@ -135,5 +144,5 @@ plt.minorticks_on()
 plt.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 plt.grid(alpha=0.5)
 plt.title("Surface EMP Intensity")
-plt.savefig("figures/emp_intensity.png", bbox_inches="tight", dpi=600)
+plt.savefig(f"figures/emp_intensity{run_id}.png", bbox_inches="tight", dpi=600)
 plt.show()
