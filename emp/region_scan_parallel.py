@@ -8,6 +8,9 @@ import argparse
 import io
 import os
 import pickle
+import concurrent.futures
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
 
 import branca
 import folium
@@ -27,6 +30,7 @@ from PIL import Image
 from tqdm import tqdm
 
 import emp.geometry as geometry
+from emp.geometry import Point
 from emp.constants import *
 from emp.model import EMPMODEL
 
@@ -89,7 +93,7 @@ def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type="norm"):
     # loop over the arrays and extract the points
     for i in range(data_dic["theta"].shape[0]):
         for j in range(data_dic["theta"].shape[1]):
-            x.append(data_dic["lamb_T_g"][i, j] * 180 / np.pi)
+            x.append(data_dic["lambd_T_g"][i, j] * 180 / np.pi)
             y.append(data_dic["phi_T_g"][i, j] * 180 / np.pi)
             z.append(field_strength[i, j])
     x = np.asarray(x)
@@ -166,7 +170,6 @@ def contour_plot(x, y, z, Burst_Point, save_path=None, grid=False, show=True):
             int(np.round(np.max(z) / level_spacing)) + 1,
         )
     ]
-    levels
     contourf = ax.contourf(xi, yi, zi, levels=levels, cmap="RdBu_r", extend="max")
     contour1 = ax.contour(
         xi, yi, zi, levels=levels, linewidths=1, linestyles="-", colors="k"
@@ -287,7 +290,17 @@ def folium_plot(contourf, lat0, long0, levels, save_path, zoom_start=5, tiles:st
     return geomap
 
 
-def region_scan(
+def load_config_file(filepath:str):
+
+    # load the config file
+    with open(filepath + "/run_config.pkl", 'rb') as f:
+        config = pickle.load(f)
+    # return config dictionary
+    return config
+
+
+def setup_region_scan_config(
+    filepath,
     Burst_Point,
     HOB=DEFAULT_HOB,
     Compton_KE=DEFAULT_Compton_KE,
@@ -347,17 +360,176 @@ def region_scan(
         A results dictionary.
     """
 
-    time_list = np.linspace(0, time_max, N_pts_time)
-
     # angular grid
     Delta_angle = geometry.compute_max_delta_angle_2d(Burst_Point)
     Delta_angle = 2.0 * Delta_angle
+
+    run_config = {
+        "filepath": filepath,
+        "Burst_Point_r_g": Burst_Point.r_g,
+        "Burst_Point_phi_g": Burst_Point.phi_g,
+        "Burst_Point_lambd_g": Burst_Point.lambd_g,
+        "HOB": HOB,
+        "Compton_KE": Compton_KE,
+        "total_yield_kt": total_yield_kt,
+        "gamma_yield_fraction": gamma_yield_fraction,
+        "pulse_param_a": pulse_param_a,
+        "pulse_param_b": pulse_param_b,
+        "rtol": rtol,
+        "N_pts_phi": N_pts_phi,
+        "N_pts_lambd": N_pts_lambd,
+        "time_max": time_max,
+        "N_pts_time": N_pts_time,
+        "b_field_type": b_field_type,
+        "Delta_angle": Delta_angle,
+        }
+
+    # save run configs
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
+    with open(filepath + '/run_config.pkl', 'wb') as f:
+        pickle.dump(run_config, f)
+
+
+def run_scan_for_single_grid_point(config_filepath, i, j):
+
+    # load the config
+    config = load_config_file(config_filepath)
+
+    # set config variables
+    HOB = config["HOB"]
+    Compton_KE = config["Compton_KE"]
+    total_yield_kt = config["total_yield_kt"]
+    gamma_yield_fraction = config["gamma_yield_fraction"]
+    pulse_param_a = config["pulse_param_a"]
+    pulse_param_b = config["pulse_param_b"]
+    rtol = config["rtol"]
+    N_pts_phi = config["N_pts_phi"]
+    N_pts_lambd = config["N_pts_lambd"]
+    time_max = config["time_max"]
+    N_pts_time = config["N_pts_time"]
+    b_field_type = config["b_field_type"]
+    Delta_angle = config["Delta_angle"]
+
+    # build the Burst point
+    Burst_Point = Point(
+        coord1 = config["Burst_Point_r_g"],
+        coord2 = config["Burst_Point_phi_g"],
+        coord3 = config["Burst_Point_lambd_g"],
+        coordsys = "lat/long geo",
+    )
+
+    # build the time and space grid
+    time_list = np.linspace(0, time_max, N_pts_time)
     phi_T_g_list = Burst_Point.phi_g + np.linspace(
         -Delta_angle / 2, Delta_angle / 2, N_pts_phi
     )
     lambd_T_g_list = Burst_Point.lambd_g + np.linspace(
-        -Delta_angle / 2, Delta_angle / 2, N_pts_phi
+        -Delta_angle / 2, Delta_angle / 2, N_pts_lambd
     )
+
+    #phi_T_g, lambd_T_g = geometry.angle_wrapper(phi_T_g_list[i], lambd_T_g_list[j])
+    phi_T_g, lambd_T_g = phi_T_g_list[i], lambd_T_g_list[j]
+
+    # update target and midway points
+    Target_Point = geometry.Point(
+        EARTH_RADIUS, phi_T_g, lambd_T_g, "lat/long geo", consistency_check=False,
+    )
+    Midway_Point = geometry.get_line_of_sight_midway_point(
+        Burst_Point, Target_Point
+    )
+
+    # the 2d angular grid will necessarily contain points that lie over the horizon
+    # the valid points will form a roughly circular inset within the rectangular domain
+    # for invalid points, return a null result
+    try:
+        # line of sight check
+        geometry.line_of_sight_check(Burst_Point, Target_Point)
+
+        # define new EMP model and solve it
+        model = EMPMODEL(
+            HOB=HOB,
+            Compton_KE=Compton_KE,
+            total_yield_kt=total_yield_kt,
+            gamma_yield_fraction=gamma_yield_fraction,
+            pulse_param_a=pulse_param_a,
+            pulse_param_b=pulse_param_b,
+            rtol=rtol,
+            A=geometry.get_A(Burst_Point, Midway_Point),
+            theta=geometry.get_theta(
+                Burst_Point, Midway_Point, b_field_type=b_field_type
+            ),
+            Bnorm=geometry.get_geomagnetic_field_norm(
+                Midway_Point, b_field_type=b_field_type
+            ),
+        )
+
+        # actually run the model
+        sol = model.solver(time_list)
+
+        # save the results and line of sight parameters
+        results = {
+            "theta": model.theta,
+            "A": model.A,
+            "phi_T_g": Target_Point.phi_g,
+            "lambd_T_g": Target_Point.lambd_g,
+            "max_E_norm_at_ground": np.max(sol["E_norm_at_ground"]),
+            "max_E_theta_at_ground": np.max(np.abs(sol["E_theta_at_ground"])),
+            "max_E_phi_at_ground":  np.max(np.abs(sol["E_phi_at_ground"])),
+        }
+
+    # the LOS check failed
+    except:
+        results = {
+            "theta": None,
+            "A": None,
+            "phi_T_g": Target_Point.phi_g,
+            "lambd_T_g": Target_Point.lambd_g,
+            "max_E_norm_at_ground": 0.0,
+            "max_E_theta_at_ground": 0.0,
+            "max_E_phi_at_ground":  0.0,
+        }
+
+    with open(config_filepath + f'/results_i_{i}_j_{j}.pkl', 'wb') as f:
+        pickle.dump(results, f)
+
+
+def background(f):
+    def wrapped(*args, **kwargs):
+        return asyncio.get_event_loop().run_in_executor(None, f, *args, **kwargs)
+
+    return wrapped
+
+
+def run_scan(config_filepath:str, parallel=False):
+
+    # load the config
+    config = load_config_file(config_filepath)
+
+    # set config variables
+    N_pts_phi = config["N_pts_phi"]
+    N_pts_lambd = config["N_pts_lambd"]
+
+    grid_points = [(i,j) for i in range(N_pts_phi) for j in range(N_pts_lambd)]
+
+    if not parallel:
+        for (i, j) in tqdm(grid_points):
+            run_scan_for_single_grid_point(config_filepath=config_filepath, i=i, j=j)
+    else:
+        with ProcessPoolExecutor() as executor:
+            futures = [executor.submit(run_scan_for_single_grid_point, config_filepath, i, j) for (i, j) in grid_points]
+        for future in futures:
+            future.result()
+        print('finished!')
+
+def scan_data_aggregator(config_filepath: str, cleanup: bool=False):
+
+    # load the config
+    config = load_config_file(config_filepath)
+
+    # set config variables
+    N_pts_phi = config["N_pts_phi"]
+    N_pts_lambd = config["N_pts_lambd"]
 
     # initialize data dictionary
     data_dic = {
@@ -370,67 +542,30 @@ def region_scan(
         "lambd_T_g": np.zeros((N_pts_phi, N_pts_lambd)),
     }
 
-    # perform the scan over location
-    for i in tqdm(range(len(phi_T_g_list))):
-        for j in tqdm(
-            range(len(lambd_T_g_list)), leave=bool(i == len(phi_T_g_list) - 1)
-        ):
+    for i in range(N_pts_phi):
+        for j in range(N_pts_lambd):
 
-            #phi_T_g, lambd_T_g = geometry.angle_wrapper(phi_T_g_list[i], lambd_T_g_list[j])
-            phi_T_g, lambd_T_g = phi_T_g_list[i], lambd_T_g_list[j]
+            # load the results
+            with open(config_filepath + f"/results_i_{i}_j_{j}.pkl", 'rb') as f:
+                results = pickle.load(f)
 
-            # update target and midway points
-            Target_Point = geometry.Point(
-                EARTH_RADIUS, phi_T_g, lambd_T_g, "lat/long geo", consistency_check=False,
-            )
-            Midway_Point = geometry.get_line_of_sight_midway_point(
-                Burst_Point, Target_Point
-            )
+            # add it to the dictionary
+            data_dic["max_E_norm_at_ground"][i,j] = results["max_E_norm_at_ground"]
+            data_dic["max_E_theta_at_ground"][i,j] = results["max_E_theta_at_ground"]
+            data_dic["max_E_phi_at_ground"][i,j] = results["max_E_phi_at_ground"]
+            data_dic["theta"][i,j] = results["theta"]
+            data_dic["A"][i,j] = results["A"]
+            data_dic["phi_T_g"][i,j] = results["phi_T_g"]
+            data_dic["lambd_T_g"][i,j] = results["lambd_T_g"]
 
-            try:
-                # line of sight check
-                # geometry.line_of_sight_check(Burst_Point, Target_Point)
+    # save
+    with open(config_filepath + f'/results.pkl', 'wb') as f:
+        pickle.dump(results, f)
 
-                # define new EMP model and solve it
-                model = EMPMODEL(
-                    HOB=HOB,
-                    Compton_KE=Compton_KE,
-                    total_yield_kt=total_yield_kt,
-                    gamma_yield_fraction=gamma_yield_fraction,
-                    pulse_param_a=pulse_param_a,
-                    pulse_param_b=pulse_param_b,
-                    rtol=rtol,
-                    A=geometry.get_A(Burst_Point, Midway_Point),
-                    theta=geometry.get_theta(
-                        Burst_Point, Midway_Point, b_field_type=b_field_type
-                    ),
-                    Bnorm=geometry.get_geomagnetic_field_norm(
-                        Midway_Point, b_field_type=b_field_type
-                    ),
-                )
-                sol = model.solver(time_list)
-                data_dic["theta"][i, j] = model.theta
-                data_dic["A"][i, j] = model.A
-
-            except:
-                # print('overshot LOS')
-                data_dic["theta"][i, j] = None
-                data_dic["A"][i, j] = None
-                sol = {
-                    "E_norm_at_ground": np.zeros(len(time_list)),
-                    "E_theta_at_ground": np.zeros(len(time_list)),
-                    "E_phi_at_ground": np.zeros(len(time_list)),
-                }
-
-            # store results
-            data_dic["phi_T_g"][i, j] = Target_Point.phi_g
-            data_dic["lambd_T_g"][i, j] = Target_Point.lambd_g
-            data_dic["max_E_norm_at_ground"][i, j] = np.max(sol["E_norm_at_ground"])
-            data_dic["max_E_theta_at_ground"][i, j] = np.max(
-                np.abs(sol["E_theta_at_ground"])
-            )
-            data_dic["max_E_phi_at_ground"][i, j] = np.max(
-                np.abs(sol["E_phi_at_ground"])
-            )
+    # optionally clean up individual line of sight files
+    if cleanup:
+        for i in range(N_pts_phi):
+            for j in range(N_pts_lambd):
+                os.remove(config_filepath + f"/results_i_{i}_j_{j}.pkl")
 
     return data_dic

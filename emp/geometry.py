@@ -133,12 +133,11 @@ class Point:
                 self.r_g, self.phi_g, self.lambd_g
             )
 
-        # check the coordinates
-        check_latlong_coords(self.r_g, self.phi_g, self.lambd_g)
-        check_latlong_coords(self.r_m, self.phi_m, self.lambd_m)
-
         # confirm that the coordinates are all consistent
         if consistency_check:
+            check_latlong_coords(self.r_g, self.phi_g, self.lambd_g)
+            check_latlong_coords(self.r_m, self.phi_m, self.lambd_m)
+
             point_latlong_geo = Point(
                 self.r_g,
                 self.phi_g,
@@ -182,10 +181,12 @@ def check_latlong_coords(r, phi, lambd):
     lambd : float
         Longitude, in radians.
     """
-    assert r >= 0
-    assert (-np.pi / 2 <= phi) and (phi <= np.pi / 2)
-    assert (-np.pi <= lambd) and (lambd < np.pi)
-
+    if r < 0:
+        raise ValueError("Radius should be >= 0.")
+    if not (-np.pi / 2 <= phi) and (phi <= np.pi / 2):
+        raise ValueError(f"phi = {phi:.04f} out of range.")
+    if not (-np.pi <= lambd) and (lambd < np.pi):
+        raise ValueError(f"lambd = {lambd:.04f} out of range.")
 
 def latlong_geo2mag(r_g, phi_g, lambd_g):
     """
@@ -931,14 +932,38 @@ def compute_max_delta_angle_2d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pt
         try:
             for i in range(len(phi_T_list)):
                 for j in range(len(lambd_T_list)):
+
+                    #phi, lambd = angle_wrapper(phi_T_list[i], lambd_T_list[j])
+                    phi, lambd = phi_T_list[i], lambd_T_list[j]
+
                     pointT = Point(
                         EARTH_RADIUS,
-                        phi_T_list[i],
-                        lambd_T_list[j],
+                        phi,
+                        lambd,
                         coordsys="lat/long geo",
+                        consistency_check=False
                     )
                     line_of_sight_check(pointB, pointT)
             return Delta_angle
         except:
             # decay the delta angle
             Delta_angle = 0.95 * Delta_angle
+
+
+def angle_wrapper(phi, lambd):
+
+    # ensure that the latitude phi is between [-pi/2, pi/2]
+    if phi > np.pi/2:
+        excess = phi - np.pi/2
+        phi = np.pi/2 - excess
+        lambd = lambd + np.pi # shift longitude by pi
+    if phi < -np.pi/2:
+        excess = abs(phi + np.pi/2)
+        phi = -np.pi/2 + excess
+
+    # ensure that the longitude lambda is between [-pi, pi]
+    lambd = lambd % (2 * np.pi) # first shift to [0, 2pi]
+    if lambd >= np.pi:
+        lambd -= 2 * np.pi # correct if necessary
+
+    return phi, lambd
