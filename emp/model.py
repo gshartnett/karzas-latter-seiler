@@ -42,18 +42,18 @@ class EMPMODEL:
 
     def __init__(
         self,
-        total_yield_kt=DEFAULT_total_yield_kt,
-        gamma_yield_fraction=DEFAULT_gamma_yield_fraction,
-        Compton_KE=DEFAULT_Compton_KE,
-        HOB=DEFAULT_HOB,
-        Bnorm=DEFAULT_Bnorm,
-        theta=DEFAULT_theta,
-        A=DEFAULT_A,
-        pulse_param_a=DEFAULT_pulse_param_a,
-        pulse_param_b=DEFAULT_pulse_param_b,
-        rtol=DEFAULT_rtol,
-        method="Radau",
-    ):
+        total_yield_kt: float = DEFAULT_total_yield_kt,
+        gamma_yield_fraction: float = DEFAULT_gamma_yield_fraction,
+        Compton_KE: float = DEFAULT_Compton_KE,
+        HOB: float = DEFAULT_HOB,
+        Bnorm: float = DEFAULT_Bnorm,
+        theta: float = DEFAULT_theta,
+        A: float = DEFAULT_A,
+        pulse_param_a: float = DEFAULT_pulse_param_a,
+        pulse_param_b: float = DEFAULT_pulse_param_b,
+        rtol: float = DEFAULT_rtol,
+        method: str = "Radau",
+    ) -> None:
         """
         Init method.
 
@@ -159,7 +159,11 @@ class EMPMODEL:
         self.rtarget = self.HOB / np.cos(self.A)
 
         # check that the angle A lies in the correct range
-        assert (0 <= self.A) or (self.A >= self.Amax)
+        if not (0 <= self.A <= self.Amax):
+            raise ValueError(
+                f"Angle A ({self.A:.4f}) must be between 0 and Amax ({self.Amax:.4f}) "
+                f"for height of burst {self.HOB} km"
+            )
 
     def RCompton(self, r):
         """

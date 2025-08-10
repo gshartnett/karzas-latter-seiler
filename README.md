@@ -17,19 +17,62 @@ The repository is organized as follows:
     - `scripts/run_line_of_sight.py`: perform a single line of sight integration
     - `scripts/run_region_scan.py`: perform a 2d scan over latitude and longitude coordinates and make the "smile" diagram
     - `scripts/run_HOB_yield_scan.py`: perform a scan over the height of burst (HOB) and yield
-- `notebooks/` contains a Jupyter notebook used to illustrate how to use the code 
+- `notebooks/` contains a Jupyter notebook used to illustrate how to use the code
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
 
 ## Installation
-This repository can be installed using [Poetry](https://python-poetry.org/). It is recommended to perform the Python installation within a conda environment:
 
-```
+### Prerequisites
+- Python 3.9 or higher
+- [Poetry](https://python-poetry.org/) (recommended) or pip
+
+### Option 1: Using Poetry (Recommended)
+It is recommended to perform the installation within a conda environment:
+
+```bash
+# Create and activate conda environment
 conda create -n emp python=3.10
 conda activate emp
-pip install poetry
+
+# Clone repository
 git clone git@github.com:gshartnett/karzas-latter-seiler.git
 cd karzas-latter-seiler
+
+# Install Poetry if not already installed
+pip install poetry
+
+# Install dependencies and package
 poetry install
+
+# Activate the poetry shell
+poetry shell
+```
+
+### Option 2: Using pip
+```bash
+# Create and activate conda environment
+conda create -n emp python=3.10
+conda activate emp
+
+# Clone repository
+git clone git@github.com:gshartnett/karzas-latter-seiler.git
+cd karzas-latter-seiler
+
+# Install dependencies
+pip install -e .
+```
+
+### Verification
+To verify the installation, run:
+```bash
+python -c "from emp.model import EMPMODEL; print('Installation successful!')"
+```
+
+### Development Installation
+For development work, install additional development dependencies:
+```bash
+poetry install --with dev
+# or with pip: pip install -e .[dev]
 ```
 
 ## Example Usage
