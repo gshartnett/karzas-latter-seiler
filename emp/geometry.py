@@ -11,7 +11,7 @@ import ppigrf
 from emp.constants import *
 
 
-def get_rotation_matrix(theta, vec_x, vec_y, vec_z):
+def get_rotation_matrix(theta: float, axis: np.ndarray) -> np.ndarray:
     """
     Rotation matrix for angle theta and axis (vx, vy, vz).
     https://en.wikipedia.org/wiki/Rotation_matrix#Conversion_from_rotation_matrix_to_axis%E2%80%93angle
@@ -20,18 +20,19 @@ def get_rotation_matrix(theta, vec_x, vec_y, vec_z):
     ----------
     theta : float
         Rotation angle, in radians.
-    vec_x : float
-        Rotation vector, x-component.
-    vec_y : float
-        Rotation vector, y-component.
-    vec_z : float
-        Rotation vector, z-component.
 
     Returns
     -------
     np.ndarray
         Rotation matrix.
     """
+    if len(axis) != 3:
+        raise ValueError("Axis must be a 3-vector.")
+
+    # Get the components of the rotation axis
+    vec_x, vec_y, vec_z = axis / np.linalg.norm(axis)
+
+    # Build the rotation matrix
     rotation_matrix = np.zeros((3, 3))
 
     rotation_matrix[0, 0] = np.cos(theta) + vec_x**2 * (1 - np.cos(theta))
@@ -49,14 +50,10 @@ def get_rotation_matrix(theta, vec_x, vec_y, vec_z):
     return rotation_matrix
 
 
-# build the rotation matrices
-ROTATION_MATRIX = get_rotation_matrix(
-    np.pi / 2 - PHI_MAGNP, -np.sin(LAMBDA_MAGNP), np.cos(LAMBDA_MAGNP), 0.0
-)
-
-INV_ROTATION_MATRIX = get_rotation_matrix(
-    -np.pi / 2 + PHI_MAGNP, -np.sin(LAMBDA_MAGNP), np.cos(LAMBDA_MAGNP), 0.0
-)
+# Build the rotation matrices
+ROTATION_AXIS = np.asarray([-np.sin(LAMBDA_MAGNP), np.cos(LAMBDA_MAGNP), 0.0])
+ROTATION_MATRIX = get_rotation_matrix(np.pi / 2 - PHI_MAGNP, ROTATION_AXIS)
+INV_ROTATION_MATRIX = get_rotation_matrix(-np.pi / 2 + PHI_MAGNP, ROTATION_AXIS)
 
 
 class Point:
