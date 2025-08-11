@@ -404,20 +404,6 @@ def _cartesian_to_spherical(x: float, y: float, z: float) -> Tuple[float, float,
     """
     r = np.sqrt(x**2 + y**2 + z**2)
     theta = np.arccos(z / r)
-    """
-    if x > 0:
-        phi = np.arctan2(y,x)
-    elif x < 0 and y >= 0:
-        phi = np.arctan2(y,x) + np.pi
-    elif x < 0 and y < 0:
-        phi = np.arctan2(y,x) - np.pi
-    elif x == 0 and y > 0:
-        phi = np.pi/2
-    elif x == 0 and y < 0:
-        phi = -np.pi/2
-    else:
-        phi = NaN
-    """
     phi = np.sign(y) * np.arccos(x / np.sqrt(x**2 + y**2))
     return r, theta, phi
 
