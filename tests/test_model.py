@@ -13,9 +13,6 @@ from emp.constants import (
     DEFAULT_Bnorm,
     DEFAULT_Compton_KE,
     DEFAULT_gamma_yield_fraction,
-    DEFAULT_pulse_param_a,
-    DEFAULT_pulse_param_b,
-    DEFAULT_rtol,
     DEFAULT_theta,
     DEFAULT_total_yield_kt,
 )
