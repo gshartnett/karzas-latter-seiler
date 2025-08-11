@@ -8,8 +8,20 @@ import os
 import pickle
 
 import matplotlib.pyplot as plt
+import numpy as np
 
-from emp.constants import *
+from emp.constants import (
+    DEFAULT_A,
+    DEFAULT_HOB,
+    DEFAULT_Bnorm,
+    DEFAULT_Compton_KE,
+    DEFAULT_gamma_yield_fraction,
+    DEFAULT_pulse_param_a,
+    DEFAULT_pulse_param_b,
+    DEFAULT_rtol,
+    DEFAULT_theta,
+    DEFAULT_total_yield_kt,
+)
 from emp.model import EMPMODEL
 
 # argument parsing
