@@ -6,6 +6,8 @@ from emp.geometry import (
     Point,
     _cartesian_to_latlong,
     _cartesian_to_spherical,
+    _latlong_geo_to_mag,
+    _latlong_mag_to_geo,
     _latlong_to_cartesian,
     _spherical_to_cartesian,
     compute_max_delta_angle_1d,
@@ -359,3 +361,54 @@ class TestComputeMaxDeltaAngle:
         assert isinstance(max_angle, float)
         assert max_angle > 0
         assert max_angle < np.pi / 6
+
+
+class TestCoordinateConversions:
+    """Test round-trip conversions between coordinate systems."""
+
+    def test_cartesian_spherical_round_trip(self) -> None:
+        """Test cartesian <-> spherical round-trip conversions."""
+        rng = np.random.default_rng(42)
+        tol = 1e-10
+
+        for _ in range(100):
+            x, y, z = rng.uniform(low=-10, high=10, size=3)
+            if np.sqrt(x**2 + y**2 + z**2) < 1e-10:
+                continue
+
+            r, theta, phi = _cartesian_to_spherical(x, y, z)
+            x2, y2, z2 = _spherical_to_cartesian(r, theta, phi)
+
+            np.testing.assert_allclose([x, y, z], [x2, y2, z2], atol=tol)
+
+    def test_cartesian_latlong_round_trip(self) -> None:
+        """Test cartesian <-> lat/long round-trip conversions."""
+        rng = np.random.default_rng(42)
+        tol = 1e-10
+
+        for _ in range(100):
+            x, y, z = rng.uniform(low=-10, high=10, size=3)
+            if np.sqrt(x**2 + y**2 + z**2) < 1e-10:
+                continue
+
+            r, phi, lambd = _cartesian_to_latlong(x, y, z)
+            x2, y2, z2 = _latlong_to_cartesian(r, phi, lambd)
+
+            np.testing.assert_allclose([x, y, z], [x2, y2, z2], atol=tol)
+
+    def test_latlong_geo_mag_round_trip(self) -> None:
+        """Test geographic <-> magnetic lat/long round-trip conversions."""
+        rng = np.random.default_rng(42)
+        tol = 1e-10
+
+        for _ in range(100):
+            r_g = rng.uniform(0.1, 10.0)
+            phi_g = rng.uniform(-np.pi / 2, np.pi / 2)
+            lambd_g = rng.uniform(-np.pi, np.pi)
+
+            r_m, phi_m, lambd_m = _latlong_geo_to_mag(r_g, phi_g, lambd_g)
+            r_g2, phi_g2, lambd_g2 = _latlong_mag_to_geo(r_m, phi_m, lambd_m)
+
+            np.testing.assert_allclose(
+                [r_g, phi_g, lambd_g], [r_g2, phi_g2, lambd_g2], atol=tol
+            )
