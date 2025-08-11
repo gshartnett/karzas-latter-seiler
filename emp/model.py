@@ -232,19 +232,19 @@ class EMPMODEL:
 
         Returns
         -------
-        float
+        Union[float, ndarray]
             Gamma flux pulse profile, in 1/ns.
         """
         mask = 1.0 * (t >= 0)  # if t<0, define the pulse to be zero
         prefactor = (self.pulse_param_a * self.pulse_param_b) / (
             self.pulse_param_b - self.pulse_param_a
         )
-        out = (
+        out: float = (
             mask
             * prefactor
             * (np.exp(-self.pulse_param_a * t) - np.exp(-self.pulse_param_b * t))
         )
-        return float(out)
+        return out
 
     def rho_divided_by_rho0(self, r) -> float:
         """
@@ -405,8 +405,6 @@ class EMPMODEL:
                 self.pulse_param_a / self.pulse_param_b
             )
         else:
-            #            main_term = (self.pulse_param_b/self.pulse_param_a)*(self.pulse_param_a*T - 1 + np.exp(-self.pulse_param_a*T) - (np.exp(self.pulse_param_a*T) - 1)*(np.exp(-self.pulse_param_a*t) - np.exp(-self.pulse_param_a*T)))
-            #            main_term -= (self.pulse_param_a/self.pulse_param_b)*(self.pulse_param_b*T - 1 + np.exp(-self.pulse_param_b*T) - (np.exp(self.pulse_param_b*T) - 1)*(np.exp(-self.pulse_param_b*t) - np.exp(-self.pulse_param_b*T)))
             main_term = (self.pulse_param_b / self.pulse_param_a) * (
                 self.pulse_param_a * T
                 + np.exp(-self.pulse_param_a * t)
@@ -418,7 +416,8 @@ class EMPMODEL:
                 - np.exp(self.pulse_param_b * (T - t))
             )
         units_conversion_factor = 1 / MEV_TO_KG * (1 / 1000) ** 3 * (1e-9)
-        return float(units_conversion_factor * prefactor * main_term)
+        result: float = units_conversion_factor * prefactor * main_term
+        return result
 
     def JCompton_theta(self, r, t) -> float:
         """
@@ -482,7 +481,8 @@ class EMPMODEL:
                 * (self.pulse_param_a / self.pulse_param_b**2)
             )
         units_conversion_factor = 1e-27
-        return float(units_conversion_factor * prefactor * main_term)
+        result: float = units_conversion_factor * prefactor * main_term
+        return result
 
     def JCompton_phi(self, r, t) -> float:
         """
@@ -530,7 +530,8 @@ class EMPMODEL:
                 self.pulse_param_a / self.pulse_param_b
             )
         units_conversion_factor = 1e-18
-        return float(units_conversion_factor * prefactor * main_term)
+        result: float = units_conversion_factor * prefactor * main_term
+        return result
 
     def JCompton_theta_KL(self, r, t) -> float:
         """
@@ -576,7 +577,8 @@ class EMPMODEL:
             return out
 
         main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        return float(units_conversion_factor * prefactor * main_term)
+        result: float = units_conversion_factor * prefactor * main_term
+        return result
 
     def JCompton_phi_KL(self, r, t) -> float:
         """
@@ -613,10 +615,11 @@ class EMPMODEL:
                 / omega_ns
             )
             out = self.f_pulse(tau_tilde) * np.sin(omega_ns * tau_p)
-            return float(out)
+            return out
 
         main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        return float(units_conversion_factor * prefactor * main_term)
+        result: float = units_conversion_factor * prefactor * main_term
+        return result
 
     def conductivity_KL(self, r, t, nuC_0) -> float:
         """
@@ -670,7 +673,8 @@ class EMPMODEL:
             lambda tau_p: integrand(tau, tau_p), 0, int_upper_limit
         )[0]
         outer_integral = quad(lambda tau: inner_integral(tau), 0.0, t)[0]
-        return float(units_conversion_factor * prefactor * outer_integral)
+        result: float = units_conversion_factor * prefactor * outer_integral
+        return result
 
     def F_theta_Seiler(self, E, r, t, nuC_0) -> float:
         """
@@ -695,10 +699,10 @@ class EMPMODEL:
             The factor of 1e3 is to account for the fact that r
             is measured in km.
         """
-        out = -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
+        result: float = -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
             self.JCompton_theta(r, t) + self.conductivity(r, t, nuC_0(r)) * E
         )
-        return float(out)
+        return result
 
     def F_phi_Seiler(self, E, r, t, nuC_0) -> float:
         """
@@ -723,10 +727,10 @@ class EMPMODEL:
             The factor of 1e3 is to account for the fact that r
             is measured in km.
         """
-        out = -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
+        result: float = -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
             self.JCompton_phi(r, t) + self.conductivity(r, t, nuC_0(r)) * E
         )
-        return float(out)
+        return result
 
     def ODE_solve(self, t, nuC_0):
         """
