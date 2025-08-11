@@ -13,7 +13,7 @@ import scipy.ndimage
 from cycler import cycler
 from tqdm import tqdm
 
-from emp.model import EMPMODEL
+from emp.model import EmpModel
 
 plt.rcParams["xtick.direction"] = "in"
 plt.rcParams["ytick.direction"] = "in"
@@ -137,7 +137,7 @@ def contour_plot(x, y, z, save_path=None, ngrid=50, levels=20):
     )
     # ax.clabel(contour1, inline=True, fontsize=8, colors='k')
     clb = fig.colorbar(contourf, ax=ax)
-    clb.ax.set_title(r'[V/m]')
+    clb.ax.set_title(r"[V/m]")
     ax.set_xlabel(r"$\log_{10}$ (Y$_{tot}$/(1\, kt))", labelpad=10)
     ax.set_ylabel(r"HOB [km]", labelpad=10)
 
@@ -155,7 +155,7 @@ def contour_plot(x, y, z, save_path=None, ngrid=50, levels=20):
 
 
 # instantiate a default emp model to copy the default param values
-model_default = EMPMODEL()
+model_default = EmpModel()
 
 
 def HOB_yield_scan(
@@ -247,7 +247,7 @@ def HOB_yield_scan(
             total_yield_kt = total_yield_kt_list[j]
 
             # define new EMP model and solve it
-            model = EMPMODEL(
+            model = EmpModel(
                 HOB=HOB,
                 Compton_KE=Compton_KE,
                 total_yield_kt=total_yield_kt,

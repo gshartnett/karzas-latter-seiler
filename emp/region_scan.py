@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 import emp.geometry as geometry
 from emp.constants import *
-from emp.model import EMPMODEL
+from emp.model import EmpModel
 
 plt.rcParams["xtick.direction"] = "in"
 plt.rcParams["ytick.direction"] = "in"
@@ -388,7 +388,7 @@ def region_scan(
                 # geometry.line_of_sight_check(Burst_Point, Target_Point)
 
                 # define new EMP model and solve it
-                model = EMPMODEL(
+                model = EmpModel(
                     HOB=HOB,
                     Compton_KE=Compton_KE,
                     total_yield_kt=total_yield_kt,

@@ -52,7 +52,7 @@ matplotlib.rcParams["axes.prop_cycle"] = cycler(
 )
 
 
-class EMPMODEL:
+class EmpModel:
     """
     The EMP model class.
     """

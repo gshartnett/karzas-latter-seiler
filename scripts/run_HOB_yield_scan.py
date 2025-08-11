@@ -8,15 +8,11 @@ import argparse
 import os
 import pickle
 
-from emp.HOB_yield_scan import (
-    HOB_yield_scan,
-    contour_plot,
-    data_dic_to_xyz,
-)
-from emp.model import EMPMODEL
+from emp.HOB_yield_scan import HOB_yield_scan, contour_plot, data_dic_to_xyz
+from emp.model import EmpModel
 
 # argument parsing
-model_default = EMPMODEL()
+model_default = EmpModel()
 parser = argparse.ArgumentParser(
     description="Compute the surface EMP intensity using the Karzas-Latter-Seiler model"
 )
@@ -88,13 +84,9 @@ parser.add_argument(
     help="Number of total_yield_kt values to #",
 )
 
-parser.add_argument(
-    "-HOB_min", default=55.0, type=float, help="Minimum HOB to #"
-)
+parser.add_argument("-HOB_min", default=55.0, type=float, help="Minimum HOB to #")
 
-parser.add_argument(
-    "-HOB_max", default=400.0, type=float, help="Maximum HOB to #"
-)
+parser.add_argument("-HOB_max", default=400.0, type=float, help="Maximum HOB to #")
 
 parser.add_argument(
     "-yield_min", default=1e0, type=float, help="Minimum total_yield_kt to #"
