@@ -3,13 +3,8 @@ Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
 """
 
-# imports
-import argparse
-import os
-import pickle
 import warnings
 
-# plotting settings
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -186,7 +181,7 @@ class EMPMODEL:
                 f"for height of burst {self.HOB} km"
             )
 
-    def RCompton(self, r):
+    def RCompton(self, r) -> float:
         """
         The Compton electron stopping distance.
 
@@ -201,9 +196,9 @@ class EMPMODEL:
             Stopping distance.
         """
         R = self.R0 / self.rho_divided_by_rho0(r)
-        return R
+        return float(R)
 
-    def TCompton(self, r):
+    def TCompton(self, r) -> float:
         """
         The (scaled) Compton electron lifetime.
 
@@ -220,9 +215,9 @@ class EMPMODEL:
         T = 1e9 * self.RCompton(r) / self.V0
         T = min(T, 1e3)  # don't let T exceed 1 micro second
         T = (1 - self.beta) * T
-        return T
+        return float(T)
 
-    def f_pulse(self, t):
+    def f_pulse(self, t) -> float:
         """
         Normalized gamma pulse, for the difference of exponential form
         used by Seiler. This parameterization of the pulse profile has
@@ -237,7 +232,7 @@ class EMPMODEL:
 
         Returns
         -------
-        Union[float, ndarray]
+        float
             Gamma flux pulse profile, in 1/ns.
         """
         mask = 1.0 * (t >= 0)  # if t<0, define the pulse to be zero
@@ -249,9 +244,9 @@ class EMPMODEL:
             * prefactor
             * (np.exp(-self.pulse_param_a * t) - np.exp(-self.pulse_param_b * t))
         )
-        return out
+        return float(out)
 
-    def rho_divided_by_rho0(self, r):
+    def rho_divided_by_rho0(self, r) -> float:
         """
         Ratio of air density at radius r to air density at sea level.
 
@@ -265,9 +260,9 @@ class EMPMODEL:
         float
             Air density ratio, dimensionless.
         """
-        return np.exp(-(self.HOB - r * np.cos(self.A)) / SCALE_HEIGHT)
+        return float(np.exp(-(self.HOB - r * np.cos(self.A)) / SCALE_HEIGHT))
 
-    def mean_free_path(self, r):
+    def mean_free_path(self, r) -> float:
         """
         Compton electron mean free path.
 
@@ -281,9 +276,9 @@ class EMPMODEL:
         float
            Mean free path, in km.
         """
-        return MEAN_FREE_PATH_AT_SEA_LEVEL / self.rho_divided_by_rho0(r)
+        return float(MEAN_FREE_PATH_AT_SEA_LEVEL / self.rho_divided_by_rho0(r))
 
-    def gCompton(self, r):
+    def gCompton(self, r) -> float:
         """
         The g function for the creation of primary electrons, as introduced
         in Karzas, Latter Eq (4).
@@ -312,9 +307,9 @@ class EMPMODEL:
             / np.cos(self.A)
             * (np.exp(r * np.cos(self.A) / SCALE_HEIGHT) - 1)
         )
-        return out
+        return float(out)
 
-    def gCompton_numerical_integration(self, r):
+    def gCompton_numerical_integration(self, r) -> float:
         """
         The g function for the creation of primary electrons
         The radius is measured from the burst.
@@ -343,9 +338,9 @@ class EMPMODEL:
             * np.exp(-integral)
             / (4 * np.pi * r**2 * self.mean_free_path(r))
         )
-        return out
+        return float(out)
 
-    def electron_collision_freq_at_sea_level(self, E, t):
+    def electron_collision_freq_at_sea_level(self, E, t) -> float:
         """
         Electron collision frequency at sea level.
         Defined in Seiler eq 55.
@@ -370,9 +365,9 @@ class EMPMODEL:
             nu_2 = (6 * 1e7) * E + (0.8 * 1e12)
         nu_3 = 2.8 * 1e12
         nu = min(4.4 * 1e12, max(nu_1, nu_2, nu_3))
-        return 1e-9 * nu
+        return float(1e-9 * nu)
 
-    def conductivity(self, r, t, nuC_0):
+    def conductivity(self, r, t, nuC_0) -> float:
         """
         The conductivity computed using Seiler's approximation.
         Defined in Seiler eq. 67 and 70. The expression in eq. 70
@@ -423,9 +418,9 @@ class EMPMODEL:
                 - np.exp(self.pulse_param_b * (T - t))
             )
         units_conversion_factor = 1 / MEV_TO_KG * (1 / 1000) ** 3 * (1e-9)
-        return units_conversion_factor * prefactor * main_term
+        return float(units_conversion_factor * prefactor * main_term)
 
-    def JCompton_theta(self, r, t):
+    def JCompton_theta(self, r, t) -> float:
         """
         The theta component of the Compton current, computed using
         Seiler's approximation. Defined in Seiler eq. 65 and 68.
@@ -487,9 +482,9 @@ class EMPMODEL:
                 * (self.pulse_param_a / self.pulse_param_b**2)
             )
         units_conversion_factor = 1e-27
-        return units_conversion_factor * prefactor * main_term
+        return float(units_conversion_factor * prefactor * main_term)
 
-    def JCompton_phi(self, r, t):
+    def JCompton_phi(self, r, t) -> float:
         """
         The azimuthal component of the Compton current, computed using
         Seiler's approximation. Defined in Seiler eq. 66 and 69.
@@ -535,9 +530,9 @@ class EMPMODEL:
                 self.pulse_param_a / self.pulse_param_b
             )
         units_conversion_factor = 1e-18
-        return units_conversion_factor * prefactor * main_term
+        return float(units_conversion_factor * prefactor * main_term)
 
-    def JCompton_theta_KL(self, r, t):
+    def JCompton_theta_KL(self, r, t) -> float:
         """
         The theta component of the Compton current, computed using
         the KL approximation. Defined in KL eq. 15.
@@ -581,9 +576,9 @@ class EMPMODEL:
             return out
 
         main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        return units_conversion_factor * prefactor * main_term
+        return float(units_conversion_factor * prefactor * main_term)
 
-    def JCompton_phi_KL(self, r, t):
+    def JCompton_phi_KL(self, r, t) -> float:
         """
         The phi component of the Compton current, computed using
         the KL approximation. Defined in KL eq. 16.
@@ -618,12 +613,12 @@ class EMPMODEL:
                 / omega_ns
             )
             out = self.f_pulse(tau_tilde) * np.sin(omega_ns * tau_p)
-            return out
+            return float(out)
 
         main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        return units_conversion_factor * prefactor * main_term
+        return float(units_conversion_factor * prefactor * main_term)
 
-    def conductivity_KL(self, r, t, nuC_0):
+    def conductivity_KL(self, r, t, nuC_0) -> float:
         """
         The conductivity computed using the KL approximation.
         Defined in KL eq. 53 and 13.
@@ -675,9 +670,9 @@ class EMPMODEL:
             lambda tau_p: integrand(tau, tau_p), 0, int_upper_limit
         )[0]
         outer_integral = quad(lambda tau: inner_integral(tau), 0.0, t)[0]
-        return units_conversion_factor * prefactor * outer_integral
+        return float(units_conversion_factor * prefactor * outer_integral)
 
-    def F_theta_Seiler(self, E, r, t, nuC_0):
+    def F_theta_Seiler(self, E, r, t, nuC_0) -> float:
         """
         The theta-component of the Maxwell equations,
         expressed as dE/dr = F(E).
@@ -700,11 +695,12 @@ class EMPMODEL:
             The factor of 1e3 is to account for the fact that r
             is measured in km.
         """
-        return -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
+        out = -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
             self.JCompton_theta(r, t) + self.conductivity(r, t, nuC_0(r)) * E
         )
+        return float(out)
 
-    def F_phi_Seiler(self, E, r, t, nuC_0):
+    def F_phi_Seiler(self, E, r, t, nuC_0) -> float:
         """
         The phi-component of the Maxwell equations,
         expressed as dE/dr = F(E).
@@ -727,9 +723,10 @@ class EMPMODEL:
             The factor of 1e3 is to account for the fact that r
             is measured in km.
         """
-        return -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
+        out = -E / r - (1e3 * VACUUM_PERMEABILITY * SPEED_OF_LIGHT / 2) * (
             self.JCompton_phi(r, t) + self.conductivity(r, t, nuC_0(r)) * E
         )
+        return float(out)
 
     def ODE_solve(self, t, nuC_0):
         """
