@@ -139,8 +139,8 @@ class Point:
             )
 
         # check the coordinates
-        validate_latlong_coords(self.r_g, self.phi_g, self.lambd_g)
-        validate_latlong_coords(self.r_m, self.phi_m, self.lambd_m)
+        self.validate_latlong_coords(self.r_g, self.phi_g, self.lambd_g)
+        self.validate_latlong_coords(self.r_m, self.phi_m, self.lambd_m)
 
         # confirm that the coordinates are all consistent
         if consistency_check:
@@ -209,40 +209,40 @@ class Point:
             (round(self.r_g, 10), round(self.phi_g, 10), round(self.lambd_g, 10))
         )
 
+    @staticmethod
+    def validate_latlong_coords(r: float, phi: float, lambd: float) -> None:
+        """
+        Confirm that the (r, phi, lambd) coordinates lie within the proper
+        range.
 
-def validate_latlong_coords(r: float, phi: float, lambd: float) -> None:
-    """
-    Confirm that the (r, phi, lambd) coordinates lie within the proper
-    range.
+        Parameters
+        ----------
+        r : float
+            Radius, any units.
+        phi : float
+            Latitude, in radians.
+        lambd : float
+            Longitude, in radians.
+        """
+        assert r >= 0
+        assert (-np.pi / 2 <= phi) and (phi <= np.pi / 2)
+        assert (-np.pi <= lambd) and (lambd < np.pi)
 
-    Parameters
-    ----------
-    r : float
-        Radius, any units.
-    phi : float
-        Latitude, in radians.
-    lambd : float
-        Longitude, in radians.
-    """
-    assert r >= 0
-    assert (-np.pi / 2 <= phi) and (phi <= np.pi / 2)
-    assert (-np.pi <= lambd) and (lambd < np.pi)
+    @staticmethod
+    def validate_spherical_coords(theta: float, phi: float) -> None:
+        """
+        Check that the spherical coordinates lie within the proper range.
+        No longer used.
 
-
-def validate_spherical_coords(theta: float, phi: float) -> None:
-    """
-    Check that the spherical coordinates lie within the proper range.
-    No longer used.
-
-    Parameters
-    ----------
-    theta : float
-        Polar spherical coordinate, in radians.
-    phi : phi
-        Azimuthal spherical coordinate, in radians.
-    """
-    assert (0 <= theta) and (theta <= np.pi)
-    assert (-np.pi <= phi) and (phi < np.pi)
+        Parameters
+        ----------
+        theta : float
+            Polar spherical coordinate, in radians.
+        phi : phi
+            Azimuthal spherical coordinate, in radians.
+        """
+        assert (0 <= theta) and (theta <= np.pi)
+        assert (-np.pi <= phi) and (phi < np.pi)
 
 
 def latlong_geo2mag(
