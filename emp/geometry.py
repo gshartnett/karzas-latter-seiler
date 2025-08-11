@@ -102,19 +102,19 @@ class Point:
         if "geo" in coordsys:
             if coordsys == "lat/long geo":
                 self.r_g, self.phi_g, self.lambd_g = coord1, coord2, coord3
-                self.x_g, self.y_g, self.z_g = latlong2cartesian(
+                self.x_g, self.y_g, self.z_g = _latlong_to_cartesian(
                     self.r_g, self.phi_g, self.lambd_g
                 )
             elif coordsys == "cartesian geo":
                 self.x_g, self.y_g, self.z_g = coord1, coord2, coord3
-                self.r_g, self.phi_g, self.lambd_g = cartesian_to_latlong(
+                self.r_g, self.phi_g, self.lambd_g = _cartesian_to_latlong(
                     self.x_g, self.y_g, self.z_g
                 )
             # convert to magnetic coords
-            self.r_m, self.phi_m, self.lambd_m = latlong_geo2mag(
+            self.r_m, self.phi_m, self.lambd_m = _latlong_geo_to_mag(
                 self.r_g, self.phi_g, self.lambd_g
             )
-            self.x_m, self.y_m, self.z_m = latlong2cartesian(
+            self.x_m, self.y_m, self.z_m = _latlong_to_cartesian(
                 self.r_m, self.phi_m, self.lambd_m
             )
 
@@ -122,19 +122,19 @@ class Point:
         else:
             if coordsys == "lat/long mag":
                 self.r_m, self.phi_m, self.lambd_m = coord1, coord2, coord3
-                self.x_m, self.y_m, self.z_m = latlong2cartesian(
+                self.x_m, self.y_m, self.z_m = _latlong_to_cartesian(
                     self.r_m, self.phi_m, self.lambd_m
                 )
             elif coordsys == "cartesian mag":
                 self.x_m, self.y_m, self.z_m = coord1, coord2, coord3
-                self.r_m, self.phi_m, self.lambd_m = cartesian_to_latlong(
+                self.r_m, self.phi_m, self.lambd_m = _cartesian_to_latlong(
                     self.x_m, self.y_m, self.z_m
                 )
             # convert to geographic coords
-            self.r_g, self.phi_g, self.lambd_g = latlong_mag2geo(
+            self.r_g, self.phi_g, self.lambd_g = _latlong_mag_to_geo(
                 self.r_m, self.phi_m, self.lambd_m
             )
-            self.x_g, self.y_g, self.z_g = latlong2cartesian(
+            self.x_g, self.y_g, self.z_g = _latlong_to_cartesian(
                 self.r_g, self.phi_g, self.lambd_g
             )
 
@@ -245,7 +245,7 @@ class Point:
         assert (-np.pi <= phi) and (phi < np.pi)
 
 
-def latlong_geo2mag(
+def _latlong_geo_to_mag(
     r_g: float, phi_g: float, lambd_g: float
 ) -> Tuple[float, float, float]:
     """
@@ -265,13 +265,13 @@ def latlong_geo2mag(
     Tuple[float, float, float]
         The three coordinates.
     """
-    x_g, y_g, z_g = latlong2cartesian(r_g, phi_g, lambd_g)
+    x_g, y_g, z_g = _latlong_to_cartesian(r_g, phi_g, lambd_g)
     x_m, y_m, z_m = np.dot(INV_ROTATION_MATRIX, np.asarray([x_g, y_g, z_g]))
-    r_m, phi_m, lambd_m = cartesian_to_latlong(x_m, y_m, z_m)
+    r_m, phi_m, lambd_m = _cartesian_to_latlong(x_m, y_m, z_m)
     return r_m, phi_m, lambd_m
 
 
-def latlong_mag2geo(
+def _latlong_mag_to_geo(
     r_m: float, phi_m: float, lambd_m: float
 ) -> Tuple[float, float, float]:
     """
@@ -291,13 +291,15 @@ def latlong_mag2geo(
     Tuple[float, float, float]
         The three coordinates.
     """
-    x_m, y_m, z_m = latlong2cartesian(r_m, phi_m, lambd_m)
+    x_m, y_m, z_m = _latlong_to_cartesian(r_m, phi_m, lambd_m)
     x_g, y_g, z_g = np.dot(ROTATION_MATRIX, np.asarray([x_m, y_m, z_m]))
-    r_g, phi_g, lambd_g = cartesian_to_latlong(x_g, y_g, z_g)
+    r_g, phi_g, lambd_g = _cartesian_to_latlong(x_g, y_g, z_g)
     return r_g, phi_g, lambd_g
 
 
-def latlong2cartesian(r: float, phi: float, lambd: float) -> Tuple[float, float, float]:
+def _latlong_to_cartesian(
+    r: float, phi: float, lambd: float
+) -> Tuple[float, float, float]:
     """
     Convert lat/long coordinates (r,ϕ,λ) to Cartesian coordinates
     (x,y,z)
@@ -322,7 +324,7 @@ def latlong2cartesian(r: float, phi: float, lambd: float) -> Tuple[float, float,
     return x, y, z
 
 
-def cartesian_to_latlong(x: float, y: float, z: float) -> Tuple[float, float, float]:
+def _cartesian_to_latlong(x: float, y: float, z: float) -> Tuple[float, float, float]:
     """
     Convert Cartesian coordinates (x,y,z) to lat/long coordinates
     (r,ϕ,λ). The choice of a pi offset for y <= 0, as opposed to 2*pi,
@@ -352,7 +354,7 @@ def cartesian_to_latlong(x: float, y: float, z: float) -> Tuple[float, float, fl
     return r, phi, lambd
 
 
-def spherical_to_cartesian(
+def _spherical_to_cartesian(
     r: float, theta: float, phi: float
 ) -> Tuple[float, float, float]:
     """
@@ -379,7 +381,7 @@ def spherical_to_cartesian(
     return x, y, z
 
 
-def cartesian_to_spherical(x: float, y: float, z: float) -> Tuple[float, float, float]:
+def _cartesian_to_spherical(x: float, y: float, z: float) -> Tuple[float, float, float]:
     """
     Convert Cartesian coordinates (x,y,z) to spherical coordinates (r,θ,ϕ)
     https://en.wikipedia.org/wiki/Spherical_coordinate_system#Coordinate_system_conversions
