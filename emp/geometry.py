@@ -3,8 +3,10 @@ Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
 """
 
+from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Tuple
+from enum import Enum
+from typing import Tuple, Union
 
 import numpy as np
 import ppigrf
