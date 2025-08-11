@@ -396,8 +396,8 @@ def region_scan(
                     pulse_param_a=pulse_param_a,
                     pulse_param_b=pulse_param_b,
                     rtol=rtol,
-                    A=geometry.get_A(Burst_Point, Midway_Point),
-                    theta=geometry.get_theta(
+                    A=geometry.get_A_angle(Burst_Point, Midway_Point),
+                    theta=geometry.get_theta_angle(
                         Burst_Point, Midway_Point, b_field_type=b_field_type
                     ),
                     Bnorm=geometry.get_geomagnetic_field_norm(

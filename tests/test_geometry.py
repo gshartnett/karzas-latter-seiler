@@ -2,11 +2,11 @@ import numpy as np
 
 from emp.geometry import (
     Point,
-    cartesian2latlong,
-    cartesian2spherical,
+    cartesian_to_latlong,
+    cartesian_to_spherical,
     get_rotation_matrix,
     latlong2cartesian,
-    spherical2cartesian,
+    spherical_to_cartesian,
 )
 
 
@@ -143,7 +143,7 @@ def test_cartesian_geo_round_trip_transformations() -> None:
     # Test cartesian -> geo -> cartesian round trip
     for _ in range(num_trials):
         x, y, z = rng.uniform(low=-10, high=10, size=3)
-        r, phi, lambd = cartesian2latlong(x, y, z)
+        r, phi, lambd = cartesian_to_latlong(x, y, z)
         x2, y2, z2 = latlong2cartesian(r, phi, lambd)
 
         np.testing.assert_allclose(
@@ -160,7 +160,7 @@ def test_cartesian_geo_round_trip_transformations() -> None:
         lambd = rng.uniform(-np.pi, np.pi)  # Valid longitude range
 
         x, y, z = latlong2cartesian(r, phi, lambd)
-        r2, phi2, lambd2 = cartesian2latlong(x, y, z)
+        r2, phi2, lambd2 = cartesian_to_latlong(x, y, z)
 
         np.testing.assert_allclose(
             [r, phi, lambd],
@@ -184,8 +184,8 @@ def test_cartesian_spherical_round_trip_transformations() -> None:
         if np.sqrt(x**2 + y**2 + z**2) < 1e-10:
             continue
 
-        r, theta, phi = cartesian2spherical(x, y, z)
-        x2, y2, z2 = spherical2cartesian(r, theta, phi)
+        r, theta, phi = cartesian_to_spherical(x, y, z)
+        x2, y2, z2 = spherical_to_cartesian(r, theta, phi)
 
         np.testing.assert_allclose(
             [x, y, z],
@@ -200,8 +200,8 @@ def test_cartesian_spherical_round_trip_transformations() -> None:
         theta = rng.uniform(0, np.pi)  # Valid polar angle range
         phi = rng.uniform(-np.pi, np.pi)  # Valid azimuthal angle range
 
-        x, y, z = spherical2cartesian(r, theta, phi)
-        r2, theta2, phi2 = cartesian2spherical(x, y, z)
+        x, y, z = spherical_to_cartesian(r, theta, phi)
+        r2, theta2, phi2 = cartesian_to_spherical(x, y, z)
 
         np.testing.assert_allclose(
             [r, theta, phi],
@@ -226,7 +226,7 @@ def test_specific_coordinate_edge_cases() -> None:
 
     for r, phi, lambd in test_cases_geo:
         x, y, z = latlong2cartesian(r, phi, lambd)
-        r2, phi2, lambd2 = cartesian2latlong(x, y, z)
+        r2, phi2, lambd2 = cartesian_to_latlong(x, y, z)
 
         np.testing.assert_allclose(
             [r, phi, lambd],

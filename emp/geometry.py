@@ -4,6 +4,7 @@ See LICENSE and README.md for information on usage and licensing
 """
 
 from datetime import datetime
+from typing import Tuple
 
 import numpy as np
 import ppigrf
@@ -99,7 +100,7 @@ class Point:
                 )
             elif coordsys == "cartesian geo":
                 self.x_g, self.y_g, self.z_g = coord1, coord2, coord3
-                self.r_g, self.phi_g, self.lambd_g = cartesian2latlong(
+                self.r_g, self.phi_g, self.lambd_g = cartesian_to_latlong(
                     self.x_g, self.y_g, self.z_g
                 )
             # convert to magnetic coords
@@ -119,7 +120,7 @@ class Point:
                 )
             elif coordsys == "cartesian mag":
                 self.x_m, self.y_m, self.z_m = coord1, coord2, coord3
-                self.r_m, self.phi_m, self.lambd_m = cartesian2latlong(
+                self.r_m, self.phi_m, self.lambd_m = cartesian_to_latlong(
                     self.x_m, self.y_m, self.z_m
                 )
             # convert to geographic coords
@@ -202,7 +203,7 @@ class Point:
         )
 
 
-def validate_latlong_coords(r, phi, lambd):
+def validate_latlong_coords(r: float, phi: float, lambd: float) -> None:
     """
     Confirm that the (r, phi, lambd) coordinates lie within the proper
     range.
@@ -221,7 +222,25 @@ def validate_latlong_coords(r, phi, lambd):
     assert (-np.pi <= lambd) and (lambd < np.pi)
 
 
-def latlong_geo2mag(r_g, phi_g, lambd_g):
+def validate_spherical_coords(theta: float, phi: float) -> None:
+    """
+    Check that the spherical coordinates lie within the proper range.
+    No longer used.
+
+    Parameters
+    ----------
+    theta : float
+        Polar spherical coordinate, in radians.
+    phi : phi
+        Azimuthal spherical coordinate, in radians.
+    """
+    assert (0 <= theta) and (theta <= np.pi)
+    assert (-np.pi <= phi) and (phi < np.pi)
+
+
+def latlong_geo2mag(
+    r_g: float, phi_g: float, lambd_g: float
+) -> Tuple[float, float, float]:
     """
     Convert the geographic lat/long to magnetic lat/long.
 
@@ -241,11 +260,13 @@ def latlong_geo2mag(r_g, phi_g, lambd_g):
     """
     x_g, y_g, z_g = latlong2cartesian(r_g, phi_g, lambd_g)
     x_m, y_m, z_m = np.dot(INV_ROTATION_MATRIX, np.asarray([x_g, y_g, z_g]))
-    r_m, phi_m, lambd_m = cartesian2latlong(x_m, y_m, z_m)
+    r_m, phi_m, lambd_m = cartesian_to_latlong(x_m, y_m, z_m)
     return r_m, phi_m, lambd_m
 
 
-def latlong_mag2geo(r_m, phi_m, lambd_m):
+def latlong_mag2geo(
+    r_m: float, phi_m: float, lambd_m: float
+) -> Tuple[float, float, float]:
     """
     Convert the geographic lat/long to magnetic lat/long.
 
@@ -265,27 +286,11 @@ def latlong_mag2geo(r_m, phi_m, lambd_m):
     """
     x_m, y_m, z_m = latlong2cartesian(r_m, phi_m, lambd_m)
     x_g, y_g, z_g = np.dot(ROTATION_MATRIX, np.asarray([x_m, y_m, z_m]))
-    r_g, phi_g, lambd_g = cartesian2latlong(x_g, y_g, z_g)
+    r_g, phi_g, lambd_g = cartesian_to_latlong(x_g, y_g, z_g)
     return r_g, phi_g, lambd_g
 
 
-def validate_spherical_coords(theta, phi):
-    """
-    Check that the spherical coordinates lie within the proper range.
-    No longer used.
-
-    Parameters
-    ----------
-    theta : float
-        Polar spherical coordinate, in radians.
-    phi : phi
-        Azimuthal spherical coordinate, in radians.
-    """
-    assert (0 <= theta) and (theta <= np.pi)
-    assert (-np.pi <= phi) and (phi < np.pi)
-
-
-def latlong2cartesian(r, phi, lambd):
+def latlong2cartesian(r: float, phi: float, lambd: float) -> Tuple[float, float, float]:
     """
     Convert lat/long coordinates (r,ϕ,λ) to Cartesian coordinates
     (x,y,z)
@@ -310,7 +315,7 @@ def latlong2cartesian(r, phi, lambd):
     return x, y, z
 
 
-def cartesian2latlong(x, y, z):
+def cartesian_to_latlong(x: float, y: float, z: float) -> Tuple[float, float, float]:
     """
     Convert Cartesian coordinates (x,y,z) to lat/long coordinates
     (r,ϕ,λ). The choice of a pi offset for y <= 0, as opposed to 2*pi,
@@ -340,7 +345,9 @@ def cartesian2latlong(x, y, z):
     return r, phi, lambd
 
 
-def spherical2cartesian(r, theta, phi):
+def spherical_to_cartesian(
+    r: float, theta: float, phi: float
+) -> Tuple[float, float, float]:
     """
     Convert spherical coordinates (r,θ,ϕ) to Cartesian coordinates (x,y,z).
     No longer used.
@@ -365,7 +372,7 @@ def spherical2cartesian(r, theta, phi):
     return x, y, z
 
 
-def cartesian2spherical(x, y, z):
+def cartesian_to_spherical(x: float, y: float, z: float) -> Tuple[float, float, float]:
     """
     Convert Cartesian coordinates (x,y,z) to spherical coordinates (r,θ,ϕ)
     https://en.wikipedia.org/wiki/Spherical_coordinate_system#Coordinate_system_conversions
@@ -406,7 +413,7 @@ def cartesian2spherical(x, y, z):
     return r, theta, phi
 
 
-def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point):
+def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point) -> np.ndarray:
     """
     Compute the vector pointing from A to B in geographic cartesian
     coordinates.
@@ -425,10 +432,10 @@ def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point):
     """
     xvec_g_from_O_to_A = np.asarray([pointA.x_g, pointA.y_g, pointA.z_g])
     xvec_g_from_O_to_B = np.asarray([pointB.x_g, pointB.y_g, pointB.z_g])
-    return xvec_g_from_O_to_B - xvec_g_from_O_to_A
+    return np.asarray(xvec_g_from_O_to_B - xvec_g_from_O_to_A)
 
 
-def great_circle_distance(pointA: Point, pointB: Point):
+def great_circle_distance(pointA: Point, pointB: Point) -> float:
     """
     Computes the great-circle distance bewteen points A, B
     on the sphere.
@@ -453,13 +460,15 @@ def great_circle_distance(pointA: Point, pointB: Point):
         + np.cos(pointA.phi_g) * np.cos(pointB.phi_g) * np.sin(delta_lambd / 2) ** 2
     )
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-    return EARTH_RADIUS * c
+    return float(EARTH_RADIUS * c)
 
 
-def get_geomagnetic_field_latlong(pointA: Point):
+def get_geomagnetic_field_latlong(pointA: Point) -> Tuple[float, float, float]:
     """
     Returns the geomagnetic field vector, evaluated at the point
     (r, phi, lambd) in magnetic coordinates.
+
+    Assumes a dipole model for the geomagnetic field.
 
     Parameters
     ----------
@@ -477,11 +486,13 @@ def get_geomagnetic_field_latlong(pointA: Point):
     return B_r, B_phi, B_lambd
 
 
-def get_geomagnetic_field_cartesian_dipole(point: Point):
+def get_geomagnetic_field_cartesian_dipole(point: Point) -> np.ndarray:
     """
     Returns the geomagnetic field vector in *geographic* cartesian
     coordinates, for the point (r, phi, lambd) in magnetic lat/long
     coordinates.
+
+    Assumes a dipole model for the geomagnetic field.
 
     Parameters
     ----------
@@ -519,10 +530,10 @@ def get_geomagnetic_field_cartesian_dipole(point: Point):
     # convert to the geographic Cartesian vector
     B_vec_g = np.dot(ROTATION_MATRIX, B_vec_m)
 
-    return B_vec_g
+    return np.asarray(B_vec_g)
 
 
-def get_geomagnetic_field_cartesian_igrf(point: Point):
+def get_geomagnetic_field_cartesian_igrf(point: Point) -> np.ndarray:
     """
     Returns the IGRF geomagnetic field vector in geographic cartesian
     coordinates, for the point (r, phi, lambd) in geographic lat/long
@@ -576,12 +587,14 @@ def get_geomagnetic_field_cartesian_igrf(point: Point):
     phi_azimuthal_hat = -np.sin(phi_azimuthal) * x_hat + np.cos(phi_azimuthal) * y_hat
 
     # build the magnetic Cartesian vector for B
-    B_vec_g = B_r * r_hat + B_theta * theta_hat + B_phi_azimuthal * phi_azimuthal_hat
+    B_vec_g = np.asarray(
+        B_r * r_hat + B_theta * theta_hat + B_phi_azimuthal * phi_azimuthal_hat
+    )
 
     return 1e-9 * B_vec_g  # convert to Teslas
 
 
-def get_geomagnetic_field_norm(point: Point, b_field_type="dipole"):
+def get_geomagnetic_field_norm(point: Point, b_field_type="dipole") -> float:
     """
     The geomagnetic field norm at point A.
 
@@ -614,10 +627,10 @@ def get_geomagnetic_field_norm(point: Point, b_field_type="dipole"):
     if b_field_type == "dipole":
         assert np.abs(norm - norm_dipole) < 1e-10
 
-    return np.linalg.norm(B_vec_g)
+    return float(np.linalg.norm(B_vec_g))
 
 
-def get_inclination_angle(point: Point, b_field_type="dipole"):
+def get_inclination_angle(point: Point, b_field_type="dipole") -> float:
     """
     The inclination angle of the geomagnetic field,
     evaluated at the point (r, phi, lambd) in magnetic coordinates.
@@ -646,10 +659,10 @@ def get_inclination_angle(point: Point, b_field_type="dipole"):
     expression_1 = np.arctan(np.abs(B_r) / np.abs(B_phi))
     expression_2 = np.arctan(2 * np.tan(np.abs(point.phi_m)))
     assert expression_1 == expression_2
-    return expression_1
+    return float(expression_1)
 
 
-def get_theta(point_b: Point, point_s: Point, b_field_type="dipole"):
+def get_theta_angle(point_b: Point, point_s: Point, b_field_type="dipole") -> float:
     """
     The angle b/w the line of sight radial vector and the local magnetic
     field. The evaluation point could be a point on the Earth's surface,
@@ -679,10 +692,10 @@ def get_theta(point_b: Point, point_s: Point, b_field_type="dipole"):
     xvec_g_from_B_to_S = get_xvec_g_from_A_to_B(point_b, point_s)
     num = np.dot(xvec_g_from_B_to_S, B_vec_g)
     den = np.linalg.norm(xvec_g_from_B_to_S) * np.linalg.norm(B_vec_g)
-    return np.arccos(num / den)
+    return float(np.arccos(num / den))
 
 
-def get_A(point_b: Point, point_s: Point):
+def get_A_angle(point_b: Point, point_s: Point) -> float:
     """
     The angle A b/w the line of sight radial vector and the
     vertical/origin-burst vector.
@@ -696,7 +709,7 @@ def get_A(point_b: Point, point_s: Point):
 
     Returns
     -------
-    _type_
+    float
         The angle A, in radians.
     """
     xvec_g_from_O_to_B = np.asarray([point_b.x_g, point_b.y_g, point_b.z_g])
@@ -705,11 +718,11 @@ def get_A(point_b: Point, point_s: Point):
     den = np.linalg.norm(xvec_g_from_B_to_S) * np.linalg.norm(xvec_g_from_O_to_B)
     # A = 0 sometimes fails due to rounding errors in the coord conversions
     if num / den > 1 and num / den < 1 + 1e-5:
-        return 0
-    return np.arccos(num / den)
+        return 0.0
+    return float(np.arccos(num / den))
 
 
-def get_line_of_sight_midway_point(point_b: Point, point_t: Point):
+def get_line_of_sight_midway_point(point_b: Point, point_t: Point) -> Point:
     """
     Get the position vector in geographic cartesian coordinates
     to a point mid-way between the upper and lower absorption layers,
@@ -727,7 +740,7 @@ def get_line_of_sight_midway_point(point_b: Point, point_t: Point):
     Point
         The midway point.
     """
-    A = get_A(point_b, point_t)
+    A = get_A_angle(point_b, point_t)
     HOB = (
         np.linalg.norm(np.asarray([point_b.x_g, point_b.y_g, point_b.z_g]))
         - EARTH_RADIUS
@@ -764,7 +777,7 @@ def get_line_of_sight_midway_point(point_b: Point, point_t: Point):
     return M
 
 
-def line_of_sight_check(pointB: Point, pointT: Point):
+def line_of_sight_check(pointB: Point, pointT: Point) -> None:
     """
     Given a burst and target point on the Earth's surface, compute
     the vector pointing from B to T and confirm that this vector's
@@ -794,14 +807,16 @@ def line_of_sight_check(pointB: Point, pointT: Point):
         assert np.linalg.norm(xvec_g_B_to_T) <= rmax
         # check angle A
         Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + HOB))
-        A = get_A(pointB, pointT)
+        A = get_A_angle(pointB, pointT)
         assert 0 <= A and A <= Amax
     except:
         raise ValueError("Coordinates have overshot the horizon!")
     return
 
 
-def compute_max_delta_angle_1d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pts=150):
+def compute_max_delta_angle_1d(
+    pointB: Point, Delta_angle=25 * np.pi / 180, N_pts=150
+) -> float:
     """
     Compute the largest delta angle such that a 1d grid
     of lat points deviating from the burst point by at
@@ -836,13 +851,17 @@ def compute_max_delta_angle_1d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pt
                     EARTH_RADIUS, phi_T_list[i], pointB.lambd_g, coordsys="lat/long geo"
                 )
                 line_of_sight_check(pointB, pointT)
-            return Delta_angle
+            return float(Delta_angle)
         except:
             # decay the delta angle
             Delta_angle = 0.95 * Delta_angle
 
+    return float(Delta_angle)
 
-def compute_max_delta_angle_2d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pts=150):
+
+def compute_max_delta_angle_2d(
+    pointB: Point, Delta_angle=25 * np.pi / 180, N_pts=150
+) -> float:
     """
     Compute the largest Delta_angle such that a 2d square grid
     of lat/long points deviating from the burst point by at
@@ -883,7 +902,9 @@ def compute_max_delta_angle_2d(pointB: Point, Delta_angle=25 * np.pi / 180, N_pt
                         coordsys="lat/long geo",
                     )
                     line_of_sight_check(pointB, pointT)
-            return Delta_angle
+            return float(Delta_angle)  # Return if all points are valid
         except:
             # decay the delta angle
             Delta_angle = 0.95 * Delta_angle
+
+    return float(Delta_angle)
