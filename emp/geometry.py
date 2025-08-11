@@ -9,7 +9,14 @@ from typing import Tuple
 import numpy as np
 import ppigrf
 
-from emp.constants import *
+from emp.constants import (
+    ABSORPTION_LAYER_LOWER,
+    ABSORPTION_LAYER_UPPER,
+    B0,
+    EARTH_RADIUS,
+    LAMBDA_MAGNP,
+    PHI_MAGNP,
+)
 
 
 def get_rotation_matrix(theta: float, axis: np.ndarray) -> np.ndarray:
@@ -793,8 +800,8 @@ def line_of_sight_check(pointB: Point, pointT: Point) -> None:
 
     Raises
     ------
-    Union[None, ValueError]
-        Raise an error if the coordinates have overshot the horizon.
+    ValueError
+        If the coordinates have overshot the horizon.
     """
     HOB = (
         np.linalg.norm(np.asarray([pointB.x_g, pointB.y_g, pointB.z_g])) - EARTH_RADIUS
@@ -802,15 +809,22 @@ def line_of_sight_check(pointB: Point, pointT: Point) -> None:
     Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + HOB))
     rmax = (EARTH_RADIUS + HOB) * np.cos(Amax)
     xvec_g_B_to_T = get_xvec_g_from_A_to_B(pointB, pointT)
-    try:
-        # check distance to target
-        assert np.linalg.norm(xvec_g_B_to_T) <= rmax
-        # check angle A
-        Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + HOB))
-        A = get_A_angle(pointB, pointT)
-        assert 0 <= A and A <= Amax
-    except:
-        raise ValueError("Coordinates have overshot the horizon!")
+
+    # Check distance to target
+    distance = np.linalg.norm(xvec_g_B_to_T)
+    if distance > rmax:
+        raise ValueError(
+            f"Target distance ({distance:.3f}) exceeds maximum line-of-sight distance ({rmax:.3f}). "
+            "Coordinates have overshot the horizon!"
+        )
+
+    # Check angle A
+    A = get_A_angle(pointB, pointT)
+    if not (0 <= A <= Amax):
+        raise ValueError(
+            f"Line-of-sight angle A ({A:.6f} rad) is outside valid range [0, {Amax:.6f}]. "
+            "Coordinates have overshot the horizon!"
+        )
     return
 
 
