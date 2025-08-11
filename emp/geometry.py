@@ -467,6 +467,8 @@ def get_geomagnetic_field_latlong(pointA: Point) -> Tuple[float, float, float]:
 
     Assumes a dipole model for the geomagnetic field.
 
+    TODO Delete
+
     Parameters
     ----------
     pointA : Point
@@ -490,6 +492,8 @@ def get_geomagnetic_field_cartesian_dipole(point: Point) -> np.ndarray:
     coordinates.
 
     Assumes a dipole model for the geomagnetic field.
+
+    TODO Delete
 
     Parameters
     ----------
@@ -541,6 +545,8 @@ def get_geomagnetic_field_cartesian_igrf(point: Point) -> np.ndarray:
     degrees, not radians. Care must be taken to not confuse the azimuthal
     phi angle here with the latitude phi angle. Therefore, within this
     function phi_azimuthal will be used.
+
+    TODO Delete
 
     Parameters
     ----------
@@ -602,6 +608,8 @@ def get_geomagnetic_field_norm(point: Point, b_field_type="dipole") -> float:
     b_field_type : str, optional
         The geomagnetic field type, defaults to dipole.
 
+    TODO Delete
+
     Returns
     -------
     float
@@ -631,6 +639,8 @@ def get_inclination_angle(point: Point, b_field_type="dipole") -> float:
     """
     The inclination angle of the geomagnetic field,
     evaluated at the point (r, phi, lambd) in magnetic coordinates.
+
+    TODO Delete
 
     As a check, the angle is computed two ways:
         (1) tan I = |B_r| / |B_phi|
@@ -665,6 +675,8 @@ def get_theta_angle(point_b: Point, point_s: Point, b_field_type="dipole") -> fl
     field. The evaluation point could be a point on the Earth's surface,
     but it seems more appropriate to pick a point lying in the absorption
     zone.
+
+    TODO Delete
 
     Parameters
     ----------
@@ -774,7 +786,7 @@ def get_line_of_sight_midway_point(point_b: Point, point_t: Point) -> Point:
     return M
 
 
-def line_of_sight_check(pointB: Point, pointT: Point) -> None:
+def line_of_sight_check(burst_point: Point, target_point: Point) -> None:
     """
     Given a burst and target point on the Earth's surface, compute
     the vector pointing from B to T and confirm that this vector's
@@ -783,9 +795,9 @@ def line_of_sight_check(pointB: Point, pointT: Point) -> None:
 
     Parameters
     ----------
-    pointB : Point
+    burst_point : Point
         Burst point.
-    pointT : Point
+    target_point : Point
         Target point.
 
     Raises
@@ -794,11 +806,12 @@ def line_of_sight_check(pointB: Point, pointT: Point) -> None:
         If the coordinates have overshot the horizon.
     """
     HOB = (
-        np.linalg.norm(np.asarray([pointB.x_g, pointB.y_g, pointB.z_g])) - EARTH_RADIUS
+        np.linalg.norm(np.asarray([burst_point.x_g, burst_point.y_g, burst_point.z_g]))
+        - EARTH_RADIUS
     )
     Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + HOB))
     rmax = (EARTH_RADIUS + HOB) * np.cos(Amax)
-    xvec_g_B_to_T = get_xvec_g_from_A_to_B(pointB, pointT)
+    xvec_g_B_to_T = get_xvec_g_from_A_to_B(burst_point, target_point)
 
     # Check distance to target
     distance = np.linalg.norm(xvec_g_B_to_T)
@@ -809,7 +822,7 @@ def line_of_sight_check(pointB: Point, pointT: Point) -> None:
         )
 
     # Check angle A
-    A = get_A_angle(pointB, pointT)
+    A = get_A_angle(burst_point, target_point)
     if not (0 <= A <= Amax):
         raise ValueError(
             f"Line-of-sight angle A ({A:.6f} rad) is outside valid range [0, {Amax:.6f}]. "
@@ -819,7 +832,7 @@ def line_of_sight_check(pointB: Point, pointT: Point) -> None:
 
 
 def compute_max_delta_angle_1d(
-    point_burst: Point,
+    burst_point: Point,
     initial_delta_angle: float = 25 * np.pi / 180,
     n_grid_points: int = 150,
     min_delta_angle: float = 1e-6,
@@ -835,7 +848,7 @@ def compute_max_delta_angle_1d(
 
     Parameters
     ----------
-    point_burst : Point
+    burst_point : Point
         Burst point in geographic coordinates.
     initial_delta_angle : float, optional
         Starting delta latitude angle, in radians. Default is 25°.
@@ -862,7 +875,7 @@ def compute_max_delta_angle_1d(
         If maximum iterations exceeded without convergence.
     """
     # Input validation
-    if point_burst.r_g <= EARTH_RADIUS:
+    if burst_point.r_g <= EARTH_RADIUS:
         raise ValueError("Burst point must be above Earth's surface")
     if initial_delta_angle <= 0:
         raise ValueError("Initial delta angle must be positive")
@@ -874,7 +887,7 @@ def compute_max_delta_angle_1d(
     def _test_delta_angle_1d(delta_angle: float) -> bool:
         """Test if all points in 1D latitude grid have line-of-sight."""
         phi_offsets = np.linspace(-delta_angle / 2, delta_angle / 2, n_grid_points)
-        phi_targets = point_burst.phi_g + phi_offsets
+        phi_targets = burst_point.phi_g + phi_offsets
 
         for phi_target in phi_targets:
             # Check latitude bounds
@@ -885,10 +898,10 @@ def compute_max_delta_angle_1d(
                 point_target = Point(
                     EARTH_RADIUS,
                     phi_target,
-                    point_burst.lambd_g,
+                    burst_point.lambd_g,
                     coordsys="lat/long geo",
                 )
-                line_of_sight_check(point_burst, point_target)
+                line_of_sight_check(burst_point, point_target)
             except ValueError:
                 return False
         return True
@@ -924,7 +937,7 @@ def compute_max_delta_angle_1d(
 
 
 def compute_max_delta_angle_2d(
-    point_burst: Point,
+    burst_point: Point,
     initial_delta_angle: float = 25 * np.pi / 180,
     n_grid_points: int = 150,
     min_delta_angle: float = 1e-6,
@@ -940,7 +953,7 @@ def compute_max_delta_angle_2d(
 
     Parameters
     ----------
-    point_burst : Point
+    burst_point : Point
         Burst point in geographic coordinates.
     initial_delta_angle : float, optional
         Starting delta angle for both latitude and longitude, in radians. Default is 25°.
@@ -967,7 +980,7 @@ def compute_max_delta_angle_2d(
         If maximum iterations exceeded without convergence.
     """
     # Input validation
-    if point_burst.r_g <= EARTH_RADIUS:
+    if burst_point.r_g <= EARTH_RADIUS:
         raise ValueError("Burst point must be above Earth's surface")
     if initial_delta_angle <= 0:
         raise ValueError("Initial delta angle must be positive")
@@ -979,8 +992,8 @@ def compute_max_delta_angle_2d(
     def _test_delta_angle_2d(delta_angle: float) -> bool:
         """Test if all points in 2D lat/long grid have line-of-sight."""
         offsets = np.linspace(-delta_angle / 2, delta_angle / 2, n_grid_points)
-        phi_targets = point_burst.phi_g + offsets
-        lambd_targets = point_burst.lambd_g + offsets
+        phi_targets = burst_point.phi_g + offsets
+        lambd_targets = burst_point.lambd_g + offsets
 
         for phi_target in phi_targets:
             # Check latitude bounds
@@ -992,13 +1005,13 @@ def compute_max_delta_angle_2d(
                     # Normalize longitude to [-π, π)
                     lambd_normalized = ((lambd_target + np.pi) % (2 * np.pi)) - np.pi
 
-                    point_target = Point(
+                    target_point = Point(
                         EARTH_RADIUS,
                         phi_target,
                         lambd_normalized,
                         coordsys="lat/long geo",
                     )
-                    line_of_sight_check(point_burst, point_target)
+                    line_of_sight_check(burst_point, target_point)
                 except ValueError:
                     return False
         return True
