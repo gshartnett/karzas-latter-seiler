@@ -131,8 +131,8 @@ class Point:
             )
 
         # check the coordinates
-        check_latlong_coords(self.r_g, self.phi_g, self.lambd_g)
-        check_latlong_coords(self.r_m, self.phi_m, self.lambd_m)
+        validate_latlong_coords(self.r_g, self.phi_g, self.lambd_g)
+        validate_latlong_coords(self.r_m, self.phi_m, self.lambd_m)
 
         # confirm that the coordinates are all consistent
         if consistency_check:
@@ -157,15 +157,52 @@ class Point:
                 self.x_m, self.y_m, self.z_m, "cartesian mag", consistency_check=False
             )
 
-            assert are_two_points_equal(point_latlong_geo, point_cartesian_geo)
-            assert are_two_points_equal(point_latlong_mag, point_cartesian_mag)
-            assert are_two_points_equal(point_latlong_geo, point_latlong_mag)
+            assert point_latlong_geo == point_cartesian_geo
+            assert point_latlong_mag == point_cartesian_mag
+            assert point_latlong_geo == point_latlong_mag
 
     def __str__(self):
-        return f'Point(rg={self.r_g}, phi_g={self.phi_g:.4f}, lambd_g={self.lambd_g:.4f})'
+        return (
+            f"Point(rg={self.r_g}, phi_g={self.phi_g:.4f}, lambd_g={self.lambd_g:.4f})"
+        )
+
+    def __eq__(self, other):
+        """
+        Return true if two points are the same.
+
+        Parameters
+        ----------
+        other : Point
+            Another point to compare with.
+
+        Returns
+        -------
+        bool
+            Are the two points equivalent?
+        """
+        if not isinstance(other, Point):
+            return False
+
+        tol = 1e-6
+        return np.all(
+            [
+                np.abs(self.__dict__[key] - other.__dict__[key]) < tol
+                for key in self.__dict__.keys()
+            ]
+        )
+
+    def __hash__(self):
+        """
+        Make Point hashable by using a tuple of rounded coordinate values.
+        This allows Points to be used in sets and as dictionary keys.
+        """
+        # Round to avoid floating point precision issues
+        return hash(
+            (round(self.r_g, 10), round(self.phi_g, 10), round(self.lambd_g, 10))
+        )
 
 
-def check_latlong_coords(r, phi, lambd):
+def validate_latlong_coords(r, phi, lambd):
     """
     Confirm that the (r, phi, lambd) coordinates lie within the proper
     range.
@@ -232,7 +269,7 @@ def latlong_mag2geo(r_m, phi_m, lambd_m):
     return r_g, phi_g, lambd_g
 
 
-def check_spherical_coords(theta, phi):
+def validate_spherical_coords(theta, phi):
     """
     Check that the spherical coordinates lie within the proper range.
     No longer used.
@@ -367,95 +404,6 @@ def cartesian2spherical(x, y, z):
     """
     phi = np.sign(y) * np.arccos(x / np.sqrt(x**2 + y**2))
     return r, theta, phi
-
-
-def are_two_points_equal(point_a: Point, point_b: Point):
-    """
-    Return true if two points are the same.
-
-    Parameters
-    ----------
-    point_a : Point
-        A point.
-    point_b : Point
-        A point.
-
-    Returns
-    -------
-    bool
-        Are the two points equivalent?
-    """
-    tol = 1e-6
-    return np.alltrue(
-        [
-            np.abs(point_a.__dict__[key] - point_b.__dict__[key]) < tol
-            for key in point_a.__dict__.keys()
-        ]
-    )
-
-
-def check_cartesian_geo(rng, num_trials=10000):
-    """
-    Check the cartesian-geo coordinate transformations.
-
-    Parameters
-    ----------
-    rng : Generator
-        The numpy RNG.
-    Ntrials : int, optional
-        Number of trials, by default 10000
-    """
-    tol = 1e-10
-
-    # check cartesian -> geo -> cartesian
-    for _ in range(num_trials):
-        x, y, z = rng.uniform(low=-10, high=10, size=3)
-        r, phi, lambd = cartesian2latlong(x, y, z)
-        x2, y2, z2 = latlong2cartesian(r, phi, lambd)
-        assert (
-            (np.abs(x - x2) < tol) and (np.abs(y - y2) < tol) and (np.abs(z - z2) < tol)
-        )
-
-    # check geo -> cartesian -> geo
-    for _ in range(num_trials):
-        r = 1
-        phi = rng.uniform(-np.pi / 2, np.pi / 2)
-        lambd = rng.uniform(-np.pi, np.pi)
-        x, y, z = latlong2cartesian(r, phi, lambd)
-        _, phi2, lambd2 = cartesian2latlong(x, y, z)
-        assert (np.abs(phi - phi2) < tol) and (np.abs(lambd - lambd2) < tol)
-
-
-def check_cartesian_spherical(rng, num_trials=10000):
-    """
-    Check the cartesian-spherical coordinate transforms.
-
-    Parameters
-    ----------
-    rng : Generator
-        The numpy RNG.
-    Ntrials : int, optional
-        Number of trials, by default 10000
-    """
-    tol = 1e-10
-
-    # check cartesian -> spherical -> cartesian
-    for _ in range(num_trials):
-        x, y, z = rng.uniform(low=-10, high=10, size=3)
-        r, theta, phi = cartesian2spherical(x, y, z)
-        x2, y2, z2 = spherical2cartesian(r, theta, phi)
-        assert (
-            (np.abs(x - x2) < tol) and (np.abs(y - y2) < tol) and (np.abs(z - z2) < tol)
-        )
-
-    # check spherical -> cartesian -> spherical
-    for _ in range(num_trials):
-        r = 1
-        theta = rng.uniform(0, np.pi)
-        phi = rng.uniform(-np.pi, np.pi)
-        x, y, z = spherical2cartesian(r, theta, phi)
-        _, theta2, phi2 = cartesian2spherical(x, y, z)
-        assert (np.abs(theta - theta2) < tol) and (np.abs(phi - phi2) < tol)
 
 
 def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point):
