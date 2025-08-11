@@ -14,13 +14,34 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from cycler import cycler
-from scipy.integrate import (
-    quad,
-    solve_ivp,
+from scipy.integrate import quad, solve_ivp
+
+from emp.constants import (
+    ABSORPTION_LAYER_LOWER,
+    ABSORPTION_LAYER_UPPER,
+    AIR_DENSITY_AT_SEA_LEVEL,
+    DEFAULT_A,
+    DEFAULT_HOB,
+    EARTH_RADIUS,
+    ELECTRON_CHARGE,
+    ELECTRON_MASS,
+    KT_TO_MEV,
+    MEAN_FREE_PATH_AT_SEA_LEVEL,
+    MEV_TO_KG,
+    SCALE_HEIGHT,
+    SPEED_OF_LIGHT,
+    VACUUM_PERMEABILITY,
+    DEFAULT_Bnorm,
+    DEFAULT_Compton_KE,
+    DEFAULT_gamma_yield_fraction,
+    DEFAULT_pulse_param_a,
+    DEFAULT_pulse_param_b,
+    DEFAULT_rtol,
+    DEFAULT_theta,
+    DEFAULT_total_yield_kt,
 )
 
-from emp.constants import *
-
+# plotting settings
 plt.rcParams["xtick.direction"] = "in"
 plt.rcParams["ytick.direction"] = "in"
 plt.rcParams["xtick.major.size"] = 5.0
