@@ -829,96 +829,215 @@ def line_of_sight_check(pointB: Point, pointT: Point) -> None:
 
 
 def compute_max_delta_angle_1d(
-    pointB: Point, Delta_angle=25 * np.pi / 180, N_pts=150
+    point_burst: Point,
+    initial_delta_angle: float = 25 * np.pi / 180,
+    n_grid_points: int = 150,
+    min_delta_angle: float = 1e-6,
+    tolerance: float = 1e-8,
+    max_iterations: int = 50,
 ) -> float:
     """
-    Compute the largest delta angle such that a 1d grid
-    of lat points deviating from the burst point by at
-    most Delta_angle radians will be entirely contained within
-    the line-of-sight cone of the burst point.
-    Geographic coordinates are assumed.
+    Compute the largest delta angle such that a 1D grid of latitude points
+    deviating from the burst point by at most delta_angle radians will be
+    entirely contained within the line-of-sight cone of the burst point.
+
+    Uses binary search for efficient convergence.
 
     Parameters
     ----------
-    pointB : Point
-        Burst point
-    Delta_angle : _type_, optional
-        Starting delta latitude angle, in radians. By default 25*np.pi/180
-    N_pts : int, optional
-        Grid points, by default 150
+    point_burst : Point
+        Burst point in geographic coordinates.
+    initial_delta_angle : float, optional
+        Starting delta latitude angle, in radians. Default is 25°.
+    n_grid_points : int, optional
+        Number of grid points to test. Default is 150.
+    min_delta_angle : float, optional
+        Minimum delta angle threshold, in radians. Default is 1e-6.
+    tolerance : float, optional
+        Convergence tolerance for binary search, in radians. Default is 1e-8.
+    max_iterations : int, optional
+        Maximum number of binary search iterations. Default is 50.
 
     Returns
     -------
     float
-        A delta latitude, in radians.
-    """
-    # perform the scan over location
-    while Delta_angle > 1e-3:
-        # build the angular grid and scan
-        phi_T_list = pointB.phi_g + np.linspace(
-            -Delta_angle / 2, Delta_angle / 2, N_pts
-        )
-        try:
-            for i in range(len(phi_T_list)):
-                # check whether the target point is within the line of sight
-                pointT = Point(
-                    EARTH_RADIUS, phi_T_list[i], pointB.lambd_g, coordsys="lat/long geo"
-                )
-                line_of_sight_check(pointB, pointT)
-            return float(Delta_angle)
-        except:
-            # decay the delta angle
-            Delta_angle = 0.95 * Delta_angle
+        The maximum delta latitude angle in radians for which all grid points
+        have line-of-sight to the burst point.
 
-    return float(Delta_angle)
+    Raises
+    ------
+    ValueError
+        If burst point is below Earth's surface or other invalid input.
+    RuntimeError
+        If maximum iterations exceeded without convergence.
+    """
+    # Input validation
+    if point_burst.r_g <= EARTH_RADIUS:
+        raise ValueError("Burst point must be above Earth's surface")
+    if initial_delta_angle <= 0:
+        raise ValueError("Initial delta angle must be positive")
+    if n_grid_points < 3:
+        raise ValueError("Need at least 3 grid points")
+    if tolerance <= 0:
+        raise ValueError("Tolerance must be positive")
+
+    def _test_delta_angle_1d(delta_angle: float) -> bool:
+        """Test if all points in 1D latitude grid have line-of-sight."""
+        phi_offsets = np.linspace(-delta_angle / 2, delta_angle / 2, n_grid_points)
+        phi_targets = point_burst.phi_g + phi_offsets
+
+        for phi_target in phi_targets:
+            # Check latitude bounds
+            if not (-np.pi / 2 <= phi_target <= np.pi / 2):
+                return False
+
+            try:
+                point_target = Point(
+                    EARTH_RADIUS,
+                    phi_target,
+                    point_burst.lambd_g,
+                    coordsys="lat/long geo",
+                )
+                line_of_sight_check(point_burst, point_target)
+            except ValueError:
+                return False
+        return True
+
+    # Binary search
+    low = min_delta_angle
+    high = initial_delta_angle
+    iteration = 0
+
+    # First check if initial angle works
+    if not _test_delta_angle_1d(high):
+        # If initial angle doesn't work, find an upper bound that fails
+        while high > min_delta_angle and not _test_delta_angle_1d(high):
+            high *= 0.5
+        if high <= min_delta_angle:
+            return float(min_delta_angle)
+
+    while (high - low) > tolerance and iteration < max_iterations:
+        iteration += 1
+        mid = (low + high) / 2
+
+        if _test_delta_angle_1d(mid):
+            low = mid  # mid works, try larger
+        else:
+            high = mid  # mid fails, try smaller
+
+    if iteration >= max_iterations:
+        raise RuntimeError(
+            f"Binary search exceeded maximum iterations ({max_iterations})"
+        )
+
+    return float(low)
 
 
 def compute_max_delta_angle_2d(
-    pointB: Point, Delta_angle=25 * np.pi / 180, N_pts=150
+    point_burst: Point,
+    initial_delta_angle: float = 25 * np.pi / 180,
+    n_grid_points: int = 150,
+    min_delta_angle: float = 1e-6,
+    tolerance: float = 1e-8,
+    max_iterations: int = 50,
 ) -> float:
     """
-    Compute the largest Delta_angle such that a 2d square grid
-    of lat/long points deviating from the burst point by at
-    most Delta_angle radians will be entirely contained within
-    the line-of-sight cone of the burst point.
-    Geographic coordinates are assumed.
+    Compute the largest delta angle such that a 2D square grid of lat/long points
+    deviating from the burst point by at most delta_angle radians will be
+    entirely contained within the line-of-sight cone of the burst point.
+
+    Uses binary search for efficient convergence.
 
     Parameters
     ----------
-    pointB : Point
-        Burst point.
-    Delta_angle : float, optional
-        Initial delta angle, in radians. By default 25*np.pi/180
-    N_pts : int, optional
-        Grid points, by default 150
+    point_burst : Point
+        Burst point in geographic coordinates.
+    initial_delta_angle : float, optional
+        Starting delta angle for both latitude and longitude, in radians. Default is 25°.
+    n_grid_points : int, optional
+        Number of grid points per dimension (total points = n_grid_points²). Default is 150.
+    min_delta_angle : float, optional
+        Minimum delta angle threshold, in radians. Default is 1e-6.
+    tolerance : float, optional
+        Convergence tolerance for binary search, in radians. Default is 1e-8.
+    max_iterations : int, optional
+        Maximum number of binary search iterations. Default is 50.
 
     Returns
     -------
     float
-        A delta angle (used for both lat and long), in radians.
+        The maximum delta angle in radians for which all grid points
+        have line-of-sight to the burst point.
+
+    Raises
+    ------
+    ValueError
+        If burst point is below Earth's surface or other invalid input.
+    RuntimeError
+        If maximum iterations exceeded without convergence.
     """
-    # perform the scan over location
-    while Delta_angle > 1e-3:
-        # build the angular grid and scan
-        phi_T_list = pointB.phi_g + np.linspace(
-            -Delta_angle / 2, Delta_angle / 2, N_pts
-        )
-        lambd_T_list = pointB.lambd_g + np.linspace(
-            -Delta_angle / 2, Delta_angle / 2, N_pts
-        )
-        try:
-            for i in range(len(phi_T_list)):
-                for j in range(len(lambd_T_list)):
-                    pointT = Point(
+    # Input validation
+    if point_burst.r_g <= EARTH_RADIUS:
+        raise ValueError("Burst point must be above Earth's surface")
+    if initial_delta_angle <= 0:
+        raise ValueError("Initial delta angle must be positive")
+    if n_grid_points < 3:
+        raise ValueError("Need at least 3 grid points per dimension")
+    if tolerance <= 0:
+        raise ValueError("Tolerance must be positive")
+
+    def _test_delta_angle_2d(delta_angle: float) -> bool:
+        """Test if all points in 2D lat/long grid have line-of-sight."""
+        offsets = np.linspace(-delta_angle / 2, delta_angle / 2, n_grid_points)
+        phi_targets = point_burst.phi_g + offsets
+        lambd_targets = point_burst.lambd_g + offsets
+
+        for phi_target in phi_targets:
+            # Check latitude bounds
+            if not (-np.pi / 2 <= phi_target <= np.pi / 2):
+                return False
+
+            for lambd_target in lambd_targets:
+                try:
+                    # Normalize longitude to [-π, π)
+                    lambd_normalized = ((lambd_target + np.pi) % (2 * np.pi)) - np.pi
+
+                    point_target = Point(
                         EARTH_RADIUS,
-                        phi_T_list[i],
-                        lambd_T_list[j],
+                        phi_target,
+                        lambd_normalized,
                         coordsys="lat/long geo",
                     )
-                    line_of_sight_check(pointB, pointT)
-            return float(Delta_angle)  # Return if all points are valid
-        except:
-            # decay the delta angle
-            Delta_angle = 0.95 * Delta_angle
+                    line_of_sight_check(point_burst, point_target)
+                except ValueError:
+                    return False
+        return True
 
-    return float(Delta_angle)
+    # Binary search
+    low = min_delta_angle
+    high = initial_delta_angle
+    iteration = 0
+
+    # First check if initial angle works
+    if not _test_delta_angle_2d(high):
+        # If initial angle doesn't work, find an upper bound that fails
+        while high > min_delta_angle and not _test_delta_angle_2d(high):
+            high *= 0.5
+        if high <= min_delta_angle:
+            return float(min_delta_angle)
+
+    while (high - low) > tolerance and iteration < max_iterations:
+        iteration += 1
+        mid = (low + high) / 2
+
+        if _test_delta_angle_2d(mid):
+            low = mid  # mid works, try larger
+        else:
+            high = mid  # mid fails, try smaller
+
+    if iteration >= max_iterations:
+        raise RuntimeError(
+            f"Binary search exceeded maximum iterations ({max_iterations})"
+        )
+
+    return float(low)
