@@ -4,6 +4,7 @@ See LICENSE and README.md for information on usage and licensing
 """
 
 import warnings
+from typing import Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -217,7 +218,7 @@ class EMPMODEL:
         T = (1 - self.beta) * T
         return float(T)
 
-    def f_pulse(self, t) -> float:
+    def f_pulse(self, t: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         """
         Normalized gamma pulse, for the difference of exponential form
         used by Seiler. This parameterization of the pulse profile has
