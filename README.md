@@ -10,6 +10,7 @@ The repository is organized as follows:
 - `emp/` contains the core code for the package
     - `emp/model.py`: contains the EMP model class and other useful functions
     - `emp/geometry.py`: contains code for geometrical calculations
+    - `emp/geomagnetic_field.py`: contains code for handling Earth's magnetic field
     - `emp/constants.py`: contains constants of nature and default model parameters
     - `emp/region_scan.py`: contains code for scanning over a range of target points and creating the "smile" diagrams
     - `emp/HOB_yield_scan.py`: contains code for scanning over a range of height of burst (HOB) values and yields

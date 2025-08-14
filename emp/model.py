@@ -10,6 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from cycler import cycler
+from numpy.typing import NDArray
 from scipy.integrate import quad, solve_ivp
 
 from emp.constants import (
@@ -218,7 +219,9 @@ class EmpModel:
         T = (1 - self.beta) * T
         return float(T)
 
-    def f_pulse(self, t: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    def f_pulse(
+        self, t: Union[float, np.ndarray]
+    ) -> Union[float, NDArray[np.floating]]:
         """
         Normalized gamma pulse, for the difference of exponential form
         used by Seiler. This parameterization of the pulse profile has
@@ -240,14 +243,16 @@ class EmpModel:
         prefactor = (self.pulse_param_a * self.pulse_param_b) / (
             self.pulse_param_b - self.pulse_param_a
         )
-        out: float = (
+        out = (
             mask
             * prefactor
             * (np.exp(-self.pulse_param_a * t) - np.exp(-self.pulse_param_b * t))
         )
-        return out
+        return out  # type: ignore
 
-    def rho_divided_by_rho0(self, r) -> float:
+    def rho_divided_by_rho0(
+        self, r: Union[float, np.ndarray]
+    ) -> Union[float, NDArray[np.floating]]:
         """
         Ratio of air density at radius r to air density at sea level.
 
@@ -261,9 +266,12 @@ class EmpModel:
         float
             Air density ratio, dimensionless.
         """
-        return float(np.exp(-(self.HOB - r * np.cos(self.A)) / SCALE_HEIGHT))
+        result = np.exp(-(self.HOB - r * np.cos(self.A)) / SCALE_HEIGHT)
+        return result  # type: ignore
 
-    def mean_free_path(self, r) -> float:
+    def mean_free_path(
+        self, r: Union[float, np.ndarray]
+    ) -> Union[float, NDArray[np.floating]]:
         """
         Compton electron mean free path.
 
@@ -277,9 +285,12 @@ class EmpModel:
         float
            Mean free path, in km.
         """
-        return float(MEAN_FREE_PATH_AT_SEA_LEVEL / self.rho_divided_by_rho0(r))
+        result = MEAN_FREE_PATH_AT_SEA_LEVEL / self.rho_divided_by_rho0(r)
+        return result  # type: ignore
 
-    def gCompton(self, r) -> float:
+    def gCompton(
+        self, r: Union[float, np.ndarray]
+    ) -> Union[float, NDArray[np.floating]]:
         """
         The g function for the creation of primary electrons, as introduced
         in Karzas, Latter Eq (4).
@@ -308,9 +319,11 @@ class EmpModel:
             / np.cos(self.A)
             * (np.exp(r * np.cos(self.A) / SCALE_HEIGHT) - 1)
         )
-        return float(out)
+        return out  # type: ignore
 
-    def gCompton_numerical_integration(self, r) -> float:
+    def gCompton_numerical_integration(
+        self, r: Union[float, np.ndarray]
+    ) -> Union[float, NDArray[np.floating]]:
         """
         The g function for the creation of primary electrons
         The radius is measured from the burst.
@@ -329,17 +342,28 @@ class EmpModel:
         float
             Compton g function, in km^(-3)
         """
+        r_array = np.asarray(r)
         integral = np.asarray(
-            [quad(lambda x: 1 / self.mean_free_path(x), 0, ri)[0] for ri in r]
+            [
+                quad(lambda x: 1 / self.mean_free_path(x), 0, ri)[0]
+                for ri in r_array.flat
+            ]
         )
+        if r_array.ndim == 0:
+            integral_val = integral.item()  # type: ignore
+            r_for_calc = r_array.item()  # type: ignore
+        else:
+            integral_val = integral.reshape(r_array.shape)
+            r_for_calc = r_array
+
         out = (
             self.gamma_yield_fraction
             * self.total_yield_MeV
             / self.Compton_KE
-            * np.exp(-integral)
-            / (4 * np.pi * r**2 * self.mean_free_path(r))
+            * np.exp(-integral_val)
+            / (4 * np.pi * r_for_calc**2 * self.mean_free_path(r_for_calc))
         )
-        return float(out)
+        return out  # type: ignore
 
     def electron_collision_freq_at_sea_level(self, E, t) -> float:
         """
@@ -368,7 +392,7 @@ class EmpModel:
         nu = min(4.4 * 1e12, max(nu_1, nu_2, nu_3))
         return float(1e-9 * nu)
 
-    def conductivity(self, r, t, nuC_0) -> float:
+    def conductivity(self, r: float, t: float, nuC_0: float) -> float:
         """
         The conductivity computed using Seiler's approximation.
         Defined in Seiler eq. 67 and 70. The expression in eq. 70
@@ -417,10 +441,10 @@ class EmpModel:
                 - np.exp(self.pulse_param_b * (T - t))
             )
         units_conversion_factor = 1 / MEV_TO_KG * (1 / 1000) ** 3 * (1e-9)
-        result: float = units_conversion_factor * prefactor * main_term
-        return result
+        result = units_conversion_factor * prefactor * main_term
+        return float(result)
 
-    def JCompton_theta(self, r, t) -> float:
+    def JCompton_theta(self, r: float, t: float) -> float:
         """
         The theta component of the Compton current, computed using
         Seiler's approximation. Defined in Seiler eq. 65 and 68.
@@ -482,10 +506,10 @@ class EmpModel:
                 * (self.pulse_param_a / self.pulse_param_b**2)
             )
         units_conversion_factor = 1e-27
-        result: float = units_conversion_factor * prefactor * main_term
-        return result
+        result = units_conversion_factor * prefactor * main_term
+        return float(result)
 
-    def JCompton_phi(self, r, t) -> float:
+    def JCompton_phi(self, r: float, t: float) -> float:
         """
         The azimuthal component of the Compton current, computed using
         Seiler's approximation. Defined in Seiler eq. 66 and 69.
@@ -531,8 +555,8 @@ class EmpModel:
                 self.pulse_param_a / self.pulse_param_b
             )
         units_conversion_factor = 1e-18
-        result: float = units_conversion_factor * prefactor * main_term
-        return result
+        result = units_conversion_factor * prefactor * main_term
+        return float(result)
 
     def JCompton_theta_KL(self, r, t) -> float:
         """
@@ -578,8 +602,8 @@ class EmpModel:
             return out
 
         main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        result: float = units_conversion_factor * prefactor * main_term
-        return result
+        result = units_conversion_factor * prefactor * main_term
+        return float(result)
 
     def JCompton_phi_KL(self, r, t) -> float:
         """
@@ -619,10 +643,10 @@ class EmpModel:
             return out
 
         main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        result: float = units_conversion_factor * prefactor * main_term
-        return result
+        result = units_conversion_factor * prefactor * main_term
+        return float(result)
 
-    def conductivity_KL(self, r, t, nuC_0) -> float:
+    def conductivity_KL(self, r: float, t: float, nuC_0: float) -> float:
         """
         The conductivity computed using the KL approximation.
         Defined in KL eq. 53 and 13.
@@ -674,8 +698,8 @@ class EmpModel:
             lambda tau_p: integrand(tau, tau_p), 0, int_upper_limit
         )[0]
         outer_integral = quad(lambda tau: inner_integral(tau), 0.0, t)[0]
-        result: float = units_conversion_factor * prefactor * outer_integral
-        return result
+        result = units_conversion_factor * prefactor * outer_integral
+        return float(result)
 
     def F_theta_Seiler(self, E, r, t, nuC_0) -> float:
         """
