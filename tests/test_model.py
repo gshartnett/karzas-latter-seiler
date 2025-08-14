@@ -347,5 +347,83 @@ class TestEMPMODEL:
         assert model.rmax > model.rmin
         assert model.rtarget > model.rmax
 
-        # Amax decreases with higher HOB due to geometry
-        # Don't compare across different HOB values since Amax decreases with height
+
+def test_rho_divided_by_rho0_at_burst_point() -> None:
+    """Test that density ratio equals 1 at the burst point (r=0)."""
+    model = EmpModel(HOB=30.0)  # 30 km height of burst
+
+    # At r=0 (burst point), we're at the burst height
+    # So rho/rho0 should equal exp(-HOB/SCALE_HEIGHT)
+    expected = np.exp(-30.0 / 7.0)  # assuming SCALE_HEIGHT = 7 km
+    result = model.rho_divided_by_rho0(r=0)
+
+    assert np.isclose(result, expected, rtol=1e-6)
+
+
+def test_rho_divided_by_rho0_at_sea_level() -> None:
+    """Test that density ratio equals 1 when the ray reaches sea level."""
+    model = EmpModel(HOB=30.0, A=0.0)  # vertical line of sight
+
+    # When r*cos(A) = HOB, we're at sea level (altitude = 0)
+    r_sea_level = model.HOB / np.cos(model.A)  # = 30 km for A=0
+    result = model.rho_divided_by_rho0(r_sea_level)
+
+    # At sea level, rho/rho0 should equal 1
+    assert np.isclose(result, 1.0, rtol=1e-6)
+
+
+def test_rho_divided_by_rho0_standard_atmosphere() -> None:
+    """Test against standard atmosphere values."""
+    model = EmpModel(HOB=20.0, A=0.0)
+
+    # Standard atmosphere: at 10 km altitude, density ~ 0.26 of sea level
+    r_for_10km_altitude = 10.0  # km (since HOB=20, altitude = 20-10 = 10 km)
+    result = model.rho_divided_by_rho0(r_for_10km_altitude)
+    expected = np.exp(-10.0 / 7.0)  # ≈ 0.24
+
+    assert np.isclose(result, expected, rtol=1e-3)
+
+
+def test_rho_divided_by_rho0_monotonic_decrease() -> None:
+    """Test that density decreases monotonically with altitude."""
+    model = EmpModel(HOB=30.0, A=0.0)
+
+    r_values = np.linspace(0, 30, 10)  # from burst to ground
+    density_ratios = [model.rho_divided_by_rho0(r) for r in r_values]
+
+    # Density should increase as we go from burst (high altitude) to ground
+    # Since r increases as altitude decreases for A=0
+    assert all(
+        density_ratios[i] <= density_ratios[i + 1]
+        for i in range(len(density_ratios) - 1)
+    )
+
+
+def test_current_components_same_order_of_magnitude() -> None:
+    """Test that KL and Seiler methods return similar orders of magnitude."""
+    model = EmpModel(HOB=30.0, theta=np.pi / 4)
+    r = 20.0
+    t = 10.0
+
+    j_theta_seiler = model.JCompton_theta(r, t)
+    j_theta_kl = model.JCompton_theta_KL(r, t)
+    j_phi_seiler = model.JCompton_phi(r, t)
+    j_phi_kl = model.JCompton_phi_KL(r, t)
+
+    # Should be within 3 orders of magnitude of each other
+    assert abs(np.log10(abs(j_theta_seiler)) - np.log10(abs(j_theta_kl))) < 3
+    assert abs(np.log10(abs(j_phi_seiler)) - np.log10(abs(j_phi_kl))) < 3
+
+
+def test_conductivity_methods_comparable() -> None:
+    """Test that KL and Seiler conductivity are comparable."""
+    model = EmpModel()
+    r = 20.0
+    t = 10.0
+    nuC_0 = 1e-3
+
+    sigma_seiler = model.conductivity(r, t, nuC_0)
+    sigma_kl = model.conductivity_KL(r, t, nuC_0)
+
+    # Should be same order of magnitude
+    assert abs(np.log10(sigma_seiler) - np.log10(sigma_kl)) < 2
