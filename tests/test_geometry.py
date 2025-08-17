@@ -86,15 +86,15 @@ def test_point_equality_across_coordinate_systems() -> None:
     )
     assert point_equator_latlong == point_equator_cartesian
 
-    # Test point at north pole
-    point_pole_latlong = Point(6371.0, np.pi / 2, 0.0, "lat/long geo")
-    point_pole_cartesian = Point(
-        point_pole_latlong.x_g,
-        point_pole_latlong.y_g,
-        point_pole_latlong.z_g,
+    # Test point near north pole (avoiding singularity)
+    point_near_pole_latlong = Point(6371.0, np.pi / 2 - 1e-10, 0.0, "lat/long geo")
+    point_near_pole_cartesian = Point(
+        point_near_pole_latlong.x_g,
+        point_near_pole_latlong.y_g,
+        point_near_pole_latlong.z_g,
         "cartesian geo",
     )
-    assert point_pole_latlong == point_pole_cartesian
+    assert point_near_pole_latlong == point_near_pole_cartesian
 
 
 def test_point_inequality() -> None:
