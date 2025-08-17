@@ -42,7 +42,7 @@ def test_rotation_matrix_properties() -> None:
 
 def test_point_equality_across_coordinate_systems() -> None:
     """Test that the same point created in different coordinate systems are equal."""
-    r = 6371.0
+    r = EARTH_RADIUS
     phi = np.pi / 4
     lambd = np.pi / 6
 
@@ -77,7 +77,7 @@ def test_point_equality_across_coordinate_systems() -> None:
     assert point_latlong_mag == point_cartesian_mag
 
     # Test point at equator
-    point_equator_latlong = Point(6371.0, 0.0, 0.0, "lat/long geo")
+    point_equator_latlong = Point(EARTH_RADIUS, 0.0, 0.0, "lat/long geo")
     point_equator_cartesian = Point(
         point_equator_latlong.x_g,
         point_equator_latlong.y_g,
@@ -87,7 +87,9 @@ def test_point_equality_across_coordinate_systems() -> None:
     assert point_equator_latlong == point_equator_cartesian
 
     # Test point near north pole (avoiding singularity)
-    point_near_pole_latlong = Point(6371.0, np.pi / 2 - 1e-10, 0.0, "lat/long geo")
+    point_near_pole_latlong = Point(
+        EARTH_RADIUS, np.pi / 2 - 1e-10, 0.0, "lat/long geo"
+    )
     point_near_pole_cartesian = Point(
         point_near_pole_latlong.x_g,
         point_near_pole_latlong.y_g,
@@ -99,10 +101,10 @@ def test_point_equality_across_coordinate_systems() -> None:
 
 def test_point_inequality() -> None:
     """Test that different points are not equal."""
-    point1 = Point(6371.0, 0.0, 0.0, "lat/long geo")
-    point2 = Point(6371.0, np.pi / 4, 0.0, "lat/long geo")
-    point3 = Point(6371.0, 0.0, np.pi / 6, "lat/long geo")
-    point4 = Point(6500.0, 0.0, 0.0, "lat/long geo")
+    point1 = Point(EARTH_RADIUS, 0.0, 0.0, "lat/long geo")
+    point2 = Point(EARTH_RADIUS, np.pi / 4, 0.0, "lat/long geo")
+    point3 = Point(EARTH_RADIUS, 0.0, np.pi / 6, "lat/long geo")
+    point4 = Point(1.5 * EARTH_RADIUS, 0.0, 0.0, "lat/long geo")
 
     assert point1 != point2
     assert point1 != point3
@@ -114,7 +116,7 @@ def test_point_inequality() -> None:
 
 def test_point_hash_consistency() -> None:
     """Test that equal points have equal hashes."""
-    r, phi, lambd = 6371.0, np.pi / 3, np.pi / 4
+    r, phi, lambd = EARTH_RADIUS, np.pi / 3, np.pi / 4
 
     point1 = Point(r, phi, lambd, "lat/long geo")
     point2 = Point(point1.x_g, point1.y_g, point1.z_g, "cartesian geo")
