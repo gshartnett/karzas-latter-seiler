@@ -4,10 +4,15 @@ See LICENSE and README.md for information on usage and licensing
 """
 
 # imports
-import argparse
 import io
-import os
-import pickle
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import branca
 import folium
@@ -16,18 +21,25 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import numpy as np
-import pandas as pd
 import scipy
-import scipy.interpolate
 import scipy.ndimage
 from cycler import cycler
-from folium import Map
-from folium.plugins import HeatMap
+from numpy.typing import NDArray
 from PIL import Image
 from tqdm import tqdm
 
 import emp.geometry as geometry
-from emp.constants import *
+from emp.constants import (
+    DEFAULT_HOB,
+    EARTH_RADIUS,
+    DEFAULT_Compton_KE,
+    DEFAULT_gamma_yield_fraction,
+    DEFAULT_pulse_param_a,
+    DEFAULT_pulse_param_b,
+    DEFAULT_rtol,
+    DEFAULT_total_yield_kt,
+)
+from emp.geomagnetic_field import MagneticFieldFactory
 from emp.model import EmpModel
 
 plt.rcParams["xtick.direction"] = "in"
@@ -45,7 +57,9 @@ matplotlib.rcParams["axes.prop_cycle"] = cycler(
 )
 
 
-def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type="norm"):
+def data_dic_to_xyz(
+    data_dic: Dict[str, Any], gaussian_smooth: bool = True, field_type: str = "norm"
+) -> Tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]]:
     """
     Convert the data into three lists x, y, z, with
         x - latitude
@@ -54,7 +68,7 @@ def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type="norm"):
 
     Parameters
     ----------
-    data_dic : Dict
+    data_dic : Dict[str, Any]
         A dictionary containing the data.
     gaussian_smooth : bool, optional
         Boolean flag used to control whether Gaussian smoothing is
@@ -65,12 +79,12 @@ def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type="norm"):
 
     Returns
     -------
-    Tupe[List[float], List[float], List[float]]
-        Returns the x,y,z lists of the extracted data.
+    Tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]]
+        Returns the x,y,z arrays of the extracted data.
     """
-    y = []
-    x = []
-    z = []
+    y: List[float] = []
+    x: List[float] = []
+    z: List[float] = []
 
     # select which component of E-field to plot (norm, theta, or phi)
     if field_type == "norm":
@@ -79,6 +93,8 @@ def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type="norm"):
         field_strength = data_dic["max_E_theta_at_ground"]
     elif field_type == "phi":
         field_strength = data_dic["max_E_phi_at_ground"]
+    else:
+        raise ValueError(f"Invalid field_type: {field_type}")
 
     # perform gaussian smoothing to make nicer plots
     # the motivation for this came from this SE post:
@@ -92,13 +108,23 @@ def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type="norm"):
             x.append(data_dic["lamb_T_g"][i, j] * 180 / np.pi)
             y.append(data_dic["phi_T_g"][i, j] * 180 / np.pi)
             z.append(field_strength[i, j])
-    x = np.asarray(x)
-    y = np.asarray(y)
-    z = np.asarray(z)
-    return x, y, z
+
+    x_array = np.asarray(x, dtype=np.floating)
+    y_array = np.asarray(y, dtype=np.floating)
+    z_array = np.asarray(z, dtype=np.floating)
+
+    return x_array, y_array, z_array
 
 
-def contour_plot(x, y, z, Burst_Point, save_path=None, grid=False, show=True):
+def contour_plot(
+    x: NDArray[np.floating],
+    y: NDArray[np.floating],
+    z: NDArray[np.floating],
+    Burst_Point: geometry.Point,
+    save_path: Optional[str] = None,
+    grid: bool = False,
+    show: bool = True,
+) -> Tuple[matplotlib.contour.QuadContourSet, List[float]]:
     """
     Build a contour plot of the x, y, z data.
     Grid interpolation is used.
@@ -107,22 +133,26 @@ def contour_plot(x, y, z, Burst_Point, save_path=None, grid=False, show=True):
 
     Parameters
     ----------
-    x : List[float]
-        A list of the x-values.
-    y : List[float]
-        A list of the y-values.
-    z : List[float]
-        A list of the z-values.
-    save_path : _type_, optional
+    x : NDArray[np.floating]
+        Array of the x-values.
+    y : NDArray[np.floating]
+        Array of the y-values.
+    z : NDArray[np.floating]
+        Array of the z-values.
+    Burst_Point : geometry.Point
+        The burst point.
+    save_path : Optional[str], optional
         Save path, by default None.
     grid : bool, optional
         Boolean flag used to control whether a grid should
         be displayed. By default False.
+    show : bool, optional
+        Whether to show the plot. By default True.
 
     Returns
     -------
-    _type_
-        A contourf object which can be used by folium.
+    Tuple[matplotlib.contour.QuadContourSet, List[float]]
+        A contourf object and levels list which can be used by folium.
     """
 
     fig, ax = plt.subplots(dpi=150, figsize=(14, 10))
@@ -147,7 +177,7 @@ def contour_plot(x, y, z, Burst_Point, save_path=None, grid=False, show=True):
             try:
                 geometry.line_of_sight_check(Burst_Point, Target_Point)
             except:
-                zi[j, i] = "nan"
+                zi[j, i] = np.nan
 
     # other interpolation schemes
     # zi = scipy.interpolate.Rbf(x, y, z, function='linear')(Xi, Yi)
@@ -159,14 +189,14 @@ def contour_plot(x, y, z, Burst_Point, save_path=None, grid=False, show=True):
 
     # create the plot
     level_spacing = 5 * 1e3
-    levels = [
+    levels: List[float] = [
         i * level_spacing
         for i in range(
             int(np.round(np.min(z) / level_spacing)) - 1,
             int(np.round(np.max(z) / level_spacing)) + 1,
         )
     ]
-    levels
+
     contourf = ax.contourf(xi, yi, zi, levels=levels, cmap="RdBu_r", extend="max")
     contour1 = ax.contour(
         xi, yi, zi, levels=levels, linewidths=1, linestyles="-", colors="k"
@@ -190,28 +220,32 @@ def contour_plot(x, y, z, Burst_Point, save_path=None, grid=False, show=True):
     return contourf, levels
 
 
-def folium_plot(contourf, lat0, long0, levels, save_path):
+def folium_plot(
+    contourf: matplotlib.contour.QuadContourSet,
+    lat0: float,
+    long0: float,
+    levels: List[float],
+    save_path: str,
+) -> folium.Map:
     """
     Super-impose a contour plot on top of a folium map.
 
     Parameters
     ----------
-    contourf : _type_
-        _description_
+    contourf : matplotlib.contour.QuadContourSet
+        Matplotlib contour object.
     lat0 : float
         Latitude of ground zero in degrees.
     long0 : float
         Longitude of ground zero in degrees.
     levels : List[float]
         Levels for the color map.
-    min_value : float
-        Minimum field value, in V/m.
     save_path : str
         Save path.
 
     Returns
     -------
-    _type_
+    folium.Map
         A folium geomap object.
     """
 
@@ -227,8 +261,7 @@ def folium_plot(contourf, lat0, long0, levels, save_path):
     geojsonf = geojsoncontour.contourf_to_geojson(contourf=contourf)
 
     # set up color map
-    # cmap = plt.cm.get_cmap('Spectral')
-    cmap = plt.cm.get_cmap("RdBu_r")
+    cmap = plt.colormaps["RdBu_r"]
     colors = [cmap(x) for x in np.linspace(0, 1, len(levels))]
     cm = branca.colormap.LinearColormap(
         colors, vmin=np.min(levels), vmax=np.max(levels)
@@ -288,20 +321,20 @@ def folium_plot(contourf, lat0, long0, levels, save_path):
 
 
 def region_scan(
-    Burst_Point,
-    HOB=DEFAULT_HOB,
-    Compton_KE=DEFAULT_Compton_KE,
-    total_yield_kt=DEFAULT_total_yield_kt,
-    gamma_yield_fraction=DEFAULT_gamma_yield_fraction,
-    pulse_param_a=DEFAULT_pulse_param_a,
-    pulse_param_b=DEFAULT_pulse_param_b,
-    rtol=DEFAULT_rtol,
-    N_pts_phi=20,
-    N_pts_lambd=20,
-    time_max=100.0,
-    N_pts_time=50,
-    b_field_type="dipole",
-):
+    Burst_Point: geometry.Point,
+    HOB: float = DEFAULT_HOB,
+    Compton_KE: float = DEFAULT_Compton_KE,
+    total_yield_kt: float = DEFAULT_total_yield_kt,
+    gamma_yield_fraction: float = DEFAULT_gamma_yield_fraction,
+    pulse_param_a: float = DEFAULT_pulse_param_a,
+    pulse_param_b: float = DEFAULT_pulse_param_b,
+    rtol: float = DEFAULT_rtol,
+    N_pts_phi: int = 20,
+    N_pts_lambd: int = 20,
+    time_max: float = 100.0,
+    N_pts_time: int = 50,
+    b_field_type: str = "dipole",
+) -> Dict[str, Union[NDArray[np.floating], NDArray[Any]]]:
     """
     Function used to perform the 2d region scan.
     Note: In order to make smooth-looking plots, a grid interpolation is
@@ -314,7 +347,7 @@ def region_scan(
 
     Parameters
     ----------
-    Burst_Point : Point
+    Burst_Point : geometry.Point
         Burst point.
     HOB : float, optional
         Height of burst, in km, by default DEFAULT_HOB.
@@ -343,7 +376,7 @@ def region_scan(
 
     Returns
     -------
-    Dict
+    Dict[str, Union[NDArray[np.floating], NDArray[Any]]]
         A results dictionary.
     """
 
@@ -359,13 +392,16 @@ def region_scan(
         -Delta_angle / 2, Delta_angle / 2, N_pts_phi
     )
 
+    # geomagnetic field
+    geomagnetic_field = MagneticFieldFactory().create(b_field_type)
+
     # initialize data dictionary
-    data_dic = {
+    data_dic: Dict[str, Union[NDArray[np.floating], NDArray[Any]]] = {
         "max_E_norm_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
         "max_E_theta_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
         "max_E_phi_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
-        "theta": np.zeros((N_pts_phi, N_pts_lambd)),
-        "A": np.zeros((N_pts_phi, N_pts_lambd)),
+        "theta": np.zeros((N_pts_phi, N_pts_lambd), dtype=object),
+        "A": np.zeros((N_pts_phi, N_pts_lambd), dtype=object),
         "phi_T_g": np.zeros((N_pts_phi, N_pts_lambd)),
         "lamb_T_g": np.zeros((N_pts_phi, N_pts_lambd)),
     }
@@ -387,6 +423,13 @@ def region_scan(
                 # line of sight check
                 # geometry.line_of_sight_check(Burst_Point, Target_Point)
 
+                # Get geometrical quantities
+                A_angle = geometry.get_A_angle(Burst_Point, Midway_Point)
+                theta_angle = geomagnetic_field.get_theta_angle(
+                    point_burst=Burst_Point, point_los=Midway_Point
+                )
+                Bnorm = geomagnetic_field.get_field_magnitude(Midway_Point)
+
                 # define new EMP model and solve it
                 model = EmpModel(
                     HOB=HOB,
@@ -396,14 +439,11 @@ def region_scan(
                     pulse_param_a=pulse_param_a,
                     pulse_param_b=pulse_param_b,
                     rtol=rtol,
-                    A=geometry.get_A(Burst_Point, Midway_Point),
-                    theta=geometry.get_theta(
-                        Burst_Point, Midway_Point, b_field_type=b_field_type
-                    ),
-                    Bnorm=geometry.get_geomagnetic_field_norm(
-                        Midway_Point, b_field_type=b_field_type
-                    ),
+                    A=A_angle,
+                    theta=theta_angle,
+                    Bnorm=Bnorm,
                 )
+
                 sol = model.solver(time_list)
                 data_dic["theta"][i, j] = model.theta
                 data_dic["A"][i, j] = model.A
