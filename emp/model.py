@@ -4,14 +4,26 @@ See LICENSE and README.md for information on usage and licensing
 """
 
 import warnings
-from typing import Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Tuple,
+    Union,
+    cast,
+)
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from cycler import cycler
 from numpy.typing import NDArray
-from scipy.integrate import quad, solve_ivp
+from scipy.integrate import (
+    quad,
+    solve_ivp,
+)
+from scipy.integrate._ivp.ivp import OdeResult
 
 from emp.constants import (
     ABSORPTION_LAYER_LOWER,
@@ -183,7 +195,7 @@ class EmpModel:
                 f"for height of burst {self.HOB} km"
             )
 
-    def RCompton(self, r) -> float:
+    def RCompton(self, r: float) -> float:
         """
         The Compton electron stopping distance.
 
@@ -200,7 +212,7 @@ class EmpModel:
         R = self.R0 / self.rho_divided_by_rho0(r)
         return float(R)
 
-    def TCompton(self, r) -> float:
+    def TCompton(self, r: float) -> float:
         """
         The (scaled) Compton electron lifetime.
 
@@ -248,7 +260,7 @@ class EmpModel:
             * prefactor
             * (np.exp(-self.pulse_param_a * t) - np.exp(-self.pulse_param_b * t))
         )
-        return out  # type: ignore
+        return out
 
     def rho_divided_by_rho0(
         self, r: Union[float, np.ndarray]
@@ -267,7 +279,7 @@ class EmpModel:
             Air density ratio, dimensionless.
         """
         result = np.exp(-(self.HOB - r * np.cos(self.A)) / SCALE_HEIGHT)
-        return result  # type: ignore
+        return result
 
     def mean_free_path(
         self, r: Union[float, np.ndarray]
@@ -286,7 +298,7 @@ class EmpModel:
            Mean free path, in km.
         """
         result = MEAN_FREE_PATH_AT_SEA_LEVEL / self.rho_divided_by_rho0(r)
-        return result  # type: ignore
+        return result
 
     def gCompton(
         self, r: Union[float, np.ndarray]
@@ -319,7 +331,7 @@ class EmpModel:
             / np.cos(self.A)
             * (np.exp(r * np.cos(self.A) / SCALE_HEIGHT) - 1)
         )
-        return out  # type: ignore
+        return out
 
     def gCompton_numerical_integration(
         self, r: Union[float, np.ndarray]
@@ -339,7 +351,7 @@ class EmpModel:
 
         Returns
         -------
-        float
+        Union[float, NDArray[np.floating]]
             Compton g function, in km^(-3)
         """
         r_array = np.asarray(r)
@@ -350,8 +362,8 @@ class EmpModel:
             ]
         )
         if r_array.ndim == 0:
-            integral_val = integral.item()  # type: ignore
-            r_for_calc = r_array.item()  # type: ignore
+            integral_val = integral.item()
+            r_for_calc = r_array.item()
         else:
             integral_val = integral.reshape(r_array.shape)
             r_for_calc = r_array
@@ -363,9 +375,9 @@ class EmpModel:
             * np.exp(-integral_val)
             / (4 * np.pi * r_for_calc**2 * self.mean_free_path(r_for_calc))
         )
-        return out  # type: ignore
+        return out
 
-    def electron_collision_freq_at_sea_level(self, E, t) -> float:
+    def electron_collision_freq_at_sea_level(self, E: float, t: float) -> float:
         """
         Electron collision frequency at sea level.
         Defined in Seiler eq 55.
@@ -558,7 +570,7 @@ class EmpModel:
         result = units_conversion_factor * prefactor * main_term
         return float(result)
 
-    def JCompton_theta_KL(self, r, t) -> float:
+    def JCompton_theta_KL(self, r: float, t: float) -> float:
         """
         The theta component of the Compton current, computed using
         the KL approximation. Defined in KL eq. 15.
@@ -589,7 +601,7 @@ class EmpModel:
         )
         units_conversion_factor = 1e-9
 
-        def integrand(tau, tau_p):
+        def integrand(tau: float, tau_p: float) -> float:
             tau_tilde = (
                 tau
                 - (1 - self.beta * np.cos(self.theta) ** 2) * tau_p
@@ -599,13 +611,16 @@ class EmpModel:
                 / omega_ns
             )
             out = self.f_pulse(tau_tilde) * (np.cos(omega_ns * tau_p) - 1)
-            return out
+            return cast(float, out)
 
-        main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        result = units_conversion_factor * prefactor * main_term
-        return float(result)
+        main_term = (
+            float,
+            quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0],
+        )
+        result = cast(float, units_conversion_factor * prefactor * main_term)
+        return result
 
-    def JCompton_phi_KL(self, r, t) -> float:
+    def JCompton_phi_KL(self, r: float, t: float) -> float:
         """
         The phi component of the Compton current, computed using
         the KL approximation. Defined in KL eq. 16.
@@ -630,7 +645,7 @@ class EmpModel:
         prefactor = -ELECTRON_CHARGE * self.V0 * self.gCompton(r) * np.sin(self.theta)
         units_conversion_factor = 1e-9
 
-        def integrand(tau, tau_p):
+        def integrand(tau: float, tau_p: float) -> float:
             tau_tilde = (
                 tau
                 - (1 - self.beta * np.cos(self.theta) ** 2) * tau_p
@@ -640,11 +655,13 @@ class EmpModel:
                 / omega_ns
             )
             out = self.f_pulse(tau_tilde) * np.sin(omega_ns * tau_p)
-            return out
+            return cast(float, out)
 
-        main_term = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
+        main_term = cast(
+            float, quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
+        )
         result = units_conversion_factor * prefactor * main_term
-        return float(result)
+        return cast(float, result)
 
     def conductivity_KL(self, r: float, t: float, nuC_0: float) -> float:
         """
@@ -682,7 +699,7 @@ class EmpModel:
         )
         units_conversion_factor = 1 / MEV_TO_KG * (1 / 1000) ** 3 * 1e-18
 
-        def integrand(tau, tau_p):
+        def integrand(tau: float, tau_p: float) -> Union[float, np.ndarray]:
             tau_tilde = (
                 tau
                 - (1 - self.beta * np.cos(self.theta) ** 2) * tau_p
@@ -694,14 +711,16 @@ class EmpModel:
             out = self.f_pulse(tau_tilde)
             return out
 
-        inner_integral = lambda tau: quad(
+        inner_integral: Callable[[float], float] = lambda tau: quad(
             lambda tau_p: integrand(tau, tau_p), 0, int_upper_limit
         )[0]
         outer_integral = quad(lambda tau: inner_integral(tau), 0.0, t)[0]
         result = units_conversion_factor * prefactor * outer_integral
-        return float(result)
+        return cast(float, result)
 
-    def F_theta_Seiler(self, E, r, t, nuC_0) -> float:
+    def F_theta_Seiler(
+        self, E: float, r: float, t: float, nuC_0: Callable[[float], float]
+    ) -> float:
         """
         The theta-component of the Maxwell equations,
         expressed as dE/dr = F(E).
@@ -714,8 +733,8 @@ class EmpModel:
             Radius from burst to point of interest, in km.
         t : float
             Evaluation retarded time, in ns.
-        nuC_0 : float
-            Ground-level electron collision frequency, in units of 1/ns.
+        nuC_0 : Callable[[float], float]
+            Ground-level electron collision frequency function, in units of 1/ns.
 
         Returns
         -------
@@ -729,7 +748,9 @@ class EmpModel:
         )
         return result
 
-    def F_phi_Seiler(self, E, r, t, nuC_0) -> float:
+    def F_phi_Seiler(
+        self, E: float, r: float, t: float, nuC_0: Callable[[float], float]
+    ) -> float:
         """
         The phi-component of the Maxwell equations,
         expressed as dE/dr = F(E).
@@ -742,8 +763,8 @@ class EmpModel:
             Radius from burst to point of interest, in km.
         t : float
             Evaluation retarded time, in ns.
-        nuC_0 : float
-            Ground-level electron collision frequency, in units of 1/ns.
+        nuC_0 : Callable[[float], float]
+            Ground-level electron collision frequency function, in units of 1/ns.
 
         Returns
         -------
@@ -757,7 +778,9 @@ class EmpModel:
         )
         return result
 
-    def ODE_solve(self, t, nuC_0):
+    def ODE_solve(
+        self, t: float, nuC_0: Callable[[float], float]
+    ) -> Tuple[OdeResult, OdeResult]:
         """
         Solve the angular components of the KL ODEs.
 
@@ -767,13 +790,13 @@ class EmpModel:
         ----------
         t : float
             Evaluation retarded time, in ns.
-        nuC_0 : float
-            Ground-level electron collision frequency, in units of 1/ns.
+        nuC_0 : Callable[[float], float]
+            Ground-level electron collision frequency function, in units of 1/ns.
 
         Returns
         -------
-        Dict
-            A result dictionary for each component (theta, phi).
+        Tuple[OdeResult, OdeResult]
+            A result tuple for each component (theta, phi).
         """
         sol_theta = solve_ivp(
             lambda r, e: self.F_theta_Seiler(e, r, t, nuC_0),
@@ -791,7 +814,9 @@ class EmpModel:
         )
         return sol_theta, sol_phi
 
-    def solver(self, tlist):
+    def solver(
+        self, tlist: NDArray[np.floating]
+    ) -> Dict[str, Union[NDArray[np.floating], List[float]]]:
         """
         Solve the KL equations using the Seiler approximations
         for the source terms for a range of retarded times and
@@ -800,17 +825,17 @@ class EmpModel:
 
         Parameters
         ----------
-        tlist : ndarray
+        tlist : NDArray[np.floating]
             A numpy array of the list of evaluation times.
 
         Returns
         -------
-        Dict
+        Dict[str, Union[NDArray[np.floating], List[float]]]
             A dictionary containing time series of the components
             and norm of the E-field evaluated at a target point
             on the Earth's surface.
         """
-        out = {
+        out: Dict[str, Union[NDArray[np.floating], List[float]]] = {
             "tlist": tlist,
             "E_theta_at_ground": [],
             "E_phi_at_ground": [],
@@ -818,7 +843,7 @@ class EmpModel:
         }
         rlist = np.linspace(self.rmin, self.rmax, 200)
         # E_norm_at_rmax = 0.0
-        E_norm_interp = lambda x: 0.0
+        E_norm_interp: Callable[[float], float] = lambda x: 0.0
 
         for t in tlist:
             # compute the electron collision freq.
@@ -829,14 +854,20 @@ class EmpModel:
                     for r in rlist
                 ]
             )
-            nuC_0 = lambda x: np.interp(x, rlist, nuC_0_points)
+            nuC_0: Callable[[float], float] = lambda x: np.interp(
+                x, rlist, nuC_0_points
+            )
 
             # solve the KL equations
             sol_theta, sol_phi = self.ODE_solve(t, nuC_0)
 
             # build an interpolation of E_norm(r)
-            E_theta_interp = lambda x: np.interp(x, sol_theta.t, sol_theta.y[0])
-            E_phi_interp = lambda x: np.interp(x, sol_phi.t, sol_phi.y[0])
+            E_theta_interp: Callable[[float], float] = lambda x: np.interp(
+                x, sol_theta.t, sol_theta.y[0]
+            )
+            E_phi_interp: Callable[[float], float] = lambda x: np.interp(
+                x, sol_phi.t, sol_phi.y[0]
+            )
             E_norm_interp = lambda x: np.sqrt(
                 E_theta_interp(x) ** 2 + E_phi_interp(x) ** 2
             )
