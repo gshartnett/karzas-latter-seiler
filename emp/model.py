@@ -613,10 +613,7 @@ class EmpModel:
             out = self.f_pulse(tau_tilde) * (np.cos(omega_ns * tau_p) - 1)
             return cast(float, out)
 
-        main_term = (
-            float,
-            quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0],
-        )
+        main_term, _ = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)
         result = cast(float, units_conversion_factor * prefactor * main_term)
         return result
 
@@ -657,9 +654,7 @@ class EmpModel:
             out = self.f_pulse(tau_tilde) * np.sin(omega_ns * tau_p)
             return cast(float, out)
 
-        main_term = cast(
-            float, quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)[0]
-        )
+        main_term, _ = quad(lambda tau_p: integrand(t, tau_p), 0, int_upper_limit)
         result = units_conversion_factor * prefactor * main_term
         return cast(float, result)
 
