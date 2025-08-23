@@ -380,8 +380,8 @@ def region_scan(
         "max_E_norm_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
         "max_E_theta_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
         "max_E_phi_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
-        "theta": np.zeros((N_pts_phi, N_pts_lambd), dtype=object),
-        "A": np.zeros((N_pts_phi, N_pts_lambd), dtype=object),
+        "theta": np.zeros((N_pts_phi, N_pts_lambd), dtype=np.float64),
+        "A": np.zeros((N_pts_phi, N_pts_lambd), dtype=np.float64),
         "phi_T_g": np.zeros((N_pts_phi, N_pts_lambd)),
         "lamb_T_g": np.zeros((N_pts_phi, N_pts_lambd)),
     }
