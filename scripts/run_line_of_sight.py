@@ -8,9 +8,21 @@ import os
 import pickle
 
 import matplotlib.pyplot as plt
+import numpy as np
 
-from emp.constants import *
-from emp.model import EMPMODEL
+from emp.constants import (
+    DEFAULT_A,
+    DEFAULT_HOB,
+    DEFAULT_Bnorm,
+    DEFAULT_Compton_KE,
+    DEFAULT_gamma_yield_fraction,
+    DEFAULT_pulse_param_a,
+    DEFAULT_pulse_param_b,
+    DEFAULT_rtol,
+    DEFAULT_theta,
+    DEFAULT_total_yield_kt,
+)
+from emp.model import EmpModel
 
 # argument parsing
 parser = argparse.ArgumentParser(
@@ -87,7 +99,7 @@ parser.add_argument(
 args = vars(parser.parse_args())
 
 # define the model
-model = EMPMODEL(
+model = EmpModel(
     HOB=args["HOB"],
     Compton_KE=args["Compton_KE"],
     total_yield_kt=args["total_yield_kt"],
