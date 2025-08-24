@@ -12,9 +12,12 @@ This section contains the complete API reference for the Karzas-Latter-Seiler EM
 Core Modules
 ------------
 
-Replace with your actual module structure:
-
 .. autosummary::
    :toctree: generated
 
+   emp.constants
    emp.geometry
+   emp.geomagnetic_field
+   emp.model
+   emp.region_scan
+   emp.HOB_yield_scan
