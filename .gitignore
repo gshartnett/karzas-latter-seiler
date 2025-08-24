@@ -3,3 +3,11 @@
 data/
 .vscode
 figures/
+
+# Documentation builds
+docs/build/
+docs/source/api/generated/
+
+# Sphinx cache
+docs/.doctrees/
+docs/source/_build/
