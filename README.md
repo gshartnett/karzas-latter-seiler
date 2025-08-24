@@ -1,6 +1,6 @@
-# The Karzas-Latter-Seiler Model of a High-Altitude Electromagnetic Pulse
-
 [![codecov](https://codecov.io/gh/gshartnett/karzas-latter-seiler/branch/main/graph/badge.svg)](https://codecov.io/gh/gshartnett/karzas-latter-seiler)
+
+# The Karzas-Latter-Seiler Model of a High-Altitude Electromagnetic Pulse
 
 ## Introduction
 This repository contains Python code for modeling the early (E1) phase of a high-altitude electromagnetic pulse (EMP). The EMP is modeled using a variant of the well-known [Karzas-Latter model](https://journals.aps.org/pr/abstract/10.1103/PhysRev.137.B1369) introduced by [Seiler](https://apps.dtic.mil/sti/citations/ADA009208). The code may be used to produce the characteristic "smile diagrams", which depict the peak intensity of the electric field over the surface of the Earth. The diagram below corresponds to a blast detonated 100 km directly overhead Topeka, Kansas.
@@ -86,4 +86,4 @@ The `EMP Notebook.ipynb` provides an introduction to the code usage. Additionall
 This code is Copyright (C) 2023 RAND Corporation, and provided under the MIT license. See `LICENSE` for more information.
 
 ## Contact
-Developed by [Gavin Hartnett](https://www.rand.org/about/people/h/hartnett_gavin_s.html) (email: hartnett@rand.org).
+Developed by [Gavin Hartnett](https://gshartnett.github.io/) (email: hartnett@rand.org).
