@@ -4,20 +4,14 @@ Karzas-Latter-Seiler EMP Model Documentation
 A Python implementation of the Karzas-Latter model for high-altitude
 electromagnetic pulse (EMP) simulation.
 
-.. note::
-   This model uses crude approximations and is intended for educational
-   and policy analysis purposes. Results are accurate to within an order
-   of magnitude.
-
 Quick Start
 -----------
 
+Simulate the effects of a high-altitude EMP.
+
 .. code-block:: python
 
-   import os
-   import pickle
    import numpy as np
-   import matplotlib.pyplot as plt
 
    from emp.constants import (
        DEFAULT_A,
@@ -47,17 +41,11 @@ Quick Start
        rtol=DEFAULT_rtol,
    )
 
-   # Perform the integration
-   sol = model.solver(np.linspace(0, 50, 200))
+   # Perform the line-of-sight integration for a range of time values
+   sol = model.solver(tlist=np.linspace(0, 50, 200))
 
 Contents
 --------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: User Guide:
-
-   user_guide/overview
 
 .. toctree::
    :maxdepth: 2
@@ -68,9 +56,6 @@ Contents
 .. toctree::
    :maxdepth: 1
    :caption: Additional Info:
-
-   changelog
-   license
 
 Indices and tables
 ==================

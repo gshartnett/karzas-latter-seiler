@@ -1,3 +1,7 @@
+"""
+Copyright (C) 2023 by The RAND Corporation
+See LICENSE and README.md for information on usage and licensing
+"""
 from abc import (
     ABC,
     abstractmethod,
