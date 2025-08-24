@@ -48,7 +48,6 @@ jobs:
       - name: Install dependencies
         run: |
           poetry install --no-interaction
-          poetry add --group dev pytest-cov
 
       - name: Run tests with coverage
         run: |
