@@ -23,6 +23,8 @@ The repository is organized as follows:
 - `notebooks/` contains a Jupyter notebook used to illustrate how to use the code
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
 
+For more information, see the Sphinx docs available [here](https://gshartnett.github.io/karzas-latter-seiler/).
+
 ## Installation
 
 ### Prerequisites
