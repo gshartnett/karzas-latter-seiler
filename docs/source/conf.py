@@ -16,7 +16,7 @@ project_authors = pyproject["tool"]["poetry"]["authors"]
 
 # -- Project information -----------------------------------------------------
 project = "Karzas-Latter-Seiler EMP Model"
-copyright = "2024, Gavin S. Hartnett"
+copyright = "2023, Gavin S. Hartnett"
 author = "Gavin S. Hartnett"
 release = project_version
 version = project_version
