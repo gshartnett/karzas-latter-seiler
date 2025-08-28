@@ -28,15 +28,15 @@ For more information, see the Sphinx docs available [here](https://gshartnett.gi
 ## Installation
 
 ### Prerequisites
-- Python 3.9 or higher
+- Python 3.11 or 3.12
 - [Poetry](https://python-poetry.org/) (recommended) or pip
 
-### Option 1: Using Poetry (Recommended)
+### Using Poetry
 It is recommended to perform the installation within a conda environment:
 
 ```bash
 # Create and activate conda environment
-conda create -n emp python=3.10
+conda create -n emp python=3.11
 conda activate emp
 
 # Clone repository
@@ -52,37 +52,6 @@ poetry install
 # Activate the poetry shell
 poetry shell
 ```
-
-### Option 2: Using pip
-```bash
-# Create and activate conda environment
-conda create -n emp python=3.10
-conda activate emp
-
-# Clone repository
-git clone git@github.com:gshartnett/karzas-latter-seiler.git
-cd karzas-latter-seiler
-
-# Install dependencies
-pip install -e .
-```
-
-### Verification
-To verify the installation, run:
-```bash
-python -c "from emp.model import EMPMODEL; print('Installation successful!')"
-```
-
-### Development Installation
-For development work, install additional development dependencies:
-```bash
-poetry install --with dev
-# or with pip: pip install -e .[dev]
-```
-
-## Example Usage
-The `EMP Notebook.ipynb` provides an introduction to the code usage. Additionally, the following commands may be run from the terminal:
-- `python scripts/run_line_of_sight.py` (solves the model for a range of times and a single target point)
 
 ## License
 This code is Copyright (C) 2023 RAND Corporation, and provided under the MIT license. See `LICENSE` for more information.
