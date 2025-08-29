@@ -318,17 +318,17 @@ class TestEMPMODEL:
         model = EmpModel(burst_point, target_point)
 
         # Use a short time list for faster testing
-        tlist = np.linspace(0, 10, 5)
+        time_points = np.linspace(0, 10, 5)
 
-        result = model.run(tlist)
+        result = model.run(time_points)
 
         # Check that it returns EmpLosResult object
         assert isinstance(result, EmpLosResult)
 
         # Check that arrays have correct length
-        assert len(result.E_theta_at_ground) == len(tlist)
-        assert len(result.E_phi_at_ground) == len(tlist)
-        assert len(result.E_norm_at_ground) == len(tlist)
+        assert len(result.E_theta_at_ground) == len(time_points)
+        assert len(result.E_phi_at_ground) == len(time_points)
+        assert len(result.E_norm_at_ground) == len(time_points)
 
         # Check that values are numeric
         for value in result.E_theta_at_ground:
@@ -351,8 +351,8 @@ class TestEMPMODEL:
         model = EmpModel(burst_point, target_point)
 
         # Run a quick calculation
-        tlist = np.linspace(0, 5, 3)
-        result = model.run(tlist)
+        time_points = np.linspace(0, 5, 3)
+        result = model.run(time_points)
 
         # Test save/load
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -364,7 +364,7 @@ class TestEMPMODEL:
             loaded_result = EmpLosResult.load(filepath)
 
             # Check key fields match
-            np.testing.assert_array_equal(loaded_result.tlist, result.tlist)
+            np.testing.assert_array_equal(loaded_result.time_points, result.time_points)
             assert loaded_result.E_theta_at_ground == result.E_theta_at_ground
             assert loaded_result.burst_point_dict == result.burst_point_dict
             assert loaded_result.target_point_dict == result.target_point_dict

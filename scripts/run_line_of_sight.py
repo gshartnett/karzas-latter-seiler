@@ -13,6 +13,8 @@ import numpy as np
 from emp.constants import (
     DEFAULT_A,
     DEFAULT_HOB,
+    DEFAULT_NUM_TIME_POINTS,
+    DEFAULT_TIME_MAX,
     DEFAULT_Bnorm,
     DEFAULT_Compton_KE,
     DEFAULT_gamma_yield_fraction,
@@ -22,15 +24,32 @@ from emp.constants import (
     DEFAULT_theta,
     DEFAULT_total_yield_kt,
 )
+from emp.geometry import Point
 from emp.model import EmpModel
 
-# argument parsing
+# Argument parsing
 parser = argparse.ArgumentParser(
     description="Compute the surface EMP intensity using the Karzas-Latter-Seiler model"
 )
 
 parser.add_argument(
     "-HOB", default=DEFAULT_HOB, type=float, help="Height of burst [km]"
+)
+
+parser.add_argument(
+    "-lat_burst", required=True, type=float, help="Latitude of burst point [deg]"
+)
+
+parser.add_argument(
+    "-lon_burst", required=True, type=float, help="Longitude of burst point [deg]"
+)
+
+parser.add_argument(
+    "-lat_target", required=True, type=float, help="Latitude of target point [deg]"
+)
+
+parser.add_argument(
+    "-lon_target", required=True, type=float, help="Longitude of target point [deg]"
 )
 
 parser.add_argument(
@@ -55,27 +74,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "-Bnorm",
-    default=DEFAULT_Bnorm,
-    type=float,
-    help="Local value of the geomagnetic field strength norm [T]",
-)
-
-parser.add_argument(
-    "-theta",
-    default=DEFAULT_theta,
-    type=float,
-    help="Angle between the line-of-sight vector and the geomagnetic field",
-)
-
-parser.add_argument(
-    "-A",
-    default=DEFAULT_A,
-    type=float,
-    help="Angle between the line-of-sight vector and the vector normal to the surface of the Earth",
-)
-
-parser.add_argument(
     "-pulse_param_a",
     default=DEFAULT_pulse_param_a,
     type=float,
@@ -96,53 +94,89 @@ parser.add_argument(
     help="Relative tolerance used in the ODE integration",
 )
 
+parser.add_argument(
+    "-method",
+    default="Radau",
+    type=str,
+    help="Integration method to use (see scipy.integrate.solve_ivp for options)",
+)
+
+parser.add_argument(
+    "-magnetic_field_model",
+    default="dipole",
+    type=str,
+    help="Magnetic field model to use (dipole or IGRF)",
+)
+
+parser.add_argument(
+    "-time_max",
+    default=DEFAULT_TIME_MAX,
+    type=float,
+    help="Maximum integration time [ns]",
+)
+
+parser.add_argument(
+    "-num_time_points",
+    default=DEFAULT_NUM_TIME_POINTS,
+    type=int,
+    help="Number of time points to evaluate the solution at",
+)
+
 args = vars(parser.parse_args())
 
-# define the model
+# Construct the burst and target points
+burst_point = Point.from_gps_coordinates(
+    args["lat_burst"], args["lon_burst"], altitude_m=args["HOB"]
+)
+target_point = Point.from_gps_coordinates(
+    args["lat_target"], args["lon_target"], altitude_m=0.0
+)
+
+# Define the model
 model = EmpModel(
-    HOB=args["HOB"],
-    Compton_KE=args["Compton_KE"],
+    burst_point=burst_point,
+    target_point=target_point,
     total_yield_kt=args["total_yield_kt"],
     gamma_yield_fraction=args["gamma_yield_fraction"],
-    Bnorm=args["Bnorm"],
-    A=args["A"],
-    theta=args["theta"],
+    Compton_KE=args["Compton_KE"],
     pulse_param_a=args["pulse_param_a"],
     pulse_param_b=args["pulse_param_b"],
     rtol=args["rtol"],
+    method=args["method"],
+    magnetic_field_model=args["magnetic_field_model"],
 )
 
-# print out param values
+# Print out param values
 print("\nRunning with parameters\n--------------------")
 for key, value in model.__dict__.items():
     print(key, "=", value)
 print("\n")
 
-# perform the integration
-sol = model.solver(np.linspace(0, 50, 200))
+# Perform the integration
+time_points = np.linspace(0, args["time_max"], args["num_time_points"])
+result = model.run(time_points)
 
-# create data and figure directories
+# Create data and figure directories
 if not os.path.exists("data"):
     os.makedirs("data")
 if not os.path.exists("figures"):
     os.makedirs("figures")
 
-# save the result
-with open("data/emp_solution.pkl", "wb") as f:
-    pickle.dump(sol, f)
+# Save the result
+result.save(filepath="data/emp_solution.json")
 
-# plot the result
+# Plot the result
 fig, ax = plt.subplots(1, figsize=(7, 5))
 ax.plot(
-    sol["tlist"],
-    sol["E_norm_at_ground"],
+    result.time_points,
+    result.E_norm_at_ground,
     "-",
     color="k",
     linewidth=1.5,
     markersize=2,
 )
-ax.set_xlabel(r"$\tau$ \ [ns]")
-ax.set_ylabel(r"E \ [V/m]")
+ax.set_xlabel(r"$\tau$ [ns]")
+ax.set_ylabel(r"E [V/m]")
 plt.minorticks_on()
 plt.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 plt.grid(alpha=0.5)

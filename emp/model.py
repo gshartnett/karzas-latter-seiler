@@ -62,7 +62,7 @@ class EmpLosResult:
     at ground level, along with model parameters used for the calculation.
     """
 
-    tlist: NDArray[np.floating]
+    time_points: NDArray[np.floating]
     E_theta_at_ground: List[float]
     E_phi_at_ground: List[float]
     E_norm_at_ground: List[float]
@@ -87,7 +87,7 @@ class EmpLosResult:
 
         # Convert numpy arrays to lists for JSON serialization
         data = {
-            "tlist": self.tlist.tolist(),
+            "time_points": self.time_points.tolist(),
             "E_theta_at_ground": self.E_theta_at_ground,
             "E_phi_at_ground": self.E_phi_at_ground,
             "E_norm_at_ground": self.E_norm_at_ground,
@@ -120,7 +120,7 @@ class EmpLosResult:
             data = json.load(f)
 
         return cls(
-            tlist=np.array(data["tlist"], dtype=np.floating),
+            time_points=np.array(data["time_points"], dtype=np.floating),
             E_theta_at_ground=data["E_theta_at_ground"],
             E_phi_at_ground=data["E_phi_at_ground"],
             E_norm_at_ground=data["E_norm_at_ground"],
@@ -136,7 +136,7 @@ class EmpLosResult:
     def get_max_field_time(self) -> float:
         """Get the time at which maximum field occurs."""
         max_idx = np.argmax(self.E_norm_at_ground)
-        return float(self.tlist[max_idx])
+        return float(self.time_points[max_idx])
 
 
 class EmpModel:
@@ -897,7 +897,7 @@ class EmpModel:
         )
         return sol_theta, sol_phi
 
-    def run(self, tlist: NDArray[np.floating]) -> EmpLosResult:
+    def run(self, time_points: NDArray[np.floating]) -> EmpLosResult:
         """
         Solve the KL equations using the Seiler approximations
         for the source terms for a range of retarded times and
@@ -906,7 +906,7 @@ class EmpModel:
 
         Parameters
         ----------
-        tlist : NDArray[np.floating]
+        time_points : NDArray[np.floating]
             A numpy array of the list of evaluation times.
 
         Returns
@@ -924,7 +924,7 @@ class EmpModel:
         # E_norm_at_rmax = 0.0
         E_norm_interp: Callable[[float], float] = lambda x: 0.0
 
-        for t in tlist:
+        for t in time_points:
             # compute the electron collision freq.
             # nuC_0 = self.electron_collision_freq_at_sea_level(E_norm_at_rmax * self.rmax/self.rtarget, t)
             nuC_0_points = np.asarray(
@@ -965,7 +965,7 @@ class EmpModel:
             np.argmax(np.abs(E_theta_at_ground)),
             np.argmax(np.abs(E_phi_at_ground)),
         )
-        if i_max == len(tlist) - 1:
+        if i_max == len(time_points) - 1:
             import warnings
 
             warnings.warn(
@@ -989,7 +989,7 @@ class EmpModel:
         }
 
         return EmpLosResult(
-            tlist=tlist,
+            time_points=time_points,
             E_theta_at_ground=E_theta_at_ground,
             E_phi_at_ground=E_phi_at_ground,
             E_norm_at_ground=E_norm_at_ground,
