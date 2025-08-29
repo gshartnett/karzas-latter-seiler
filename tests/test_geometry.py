@@ -430,5 +430,4 @@ def test_from_gps_coordinates_and_distance() -> None:
 
     # Known great-circle distance ~ 5570 km
     distance = great_circle_distance(nyc, london)
-    print(distance)
     assert pytest.approx(distance, rel=0.01) == 5570  # within 1%
