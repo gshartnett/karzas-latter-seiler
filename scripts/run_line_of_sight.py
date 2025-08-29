@@ -1,185 +1,99 @@
 """
 Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
+
+EMP Line-of-Sight Simulation Script
+
+This script runs an EMP line-of-sight calculation using a YAML configuration file.
+
+Usage:
+    python run_line_of_sight.py                    # Uses default config: configs/example/basic_line_of_sight.yaml
+    python run_line_of_sight.py my_config.yaml     # Uses specified config file
+    python run_line_of_sight.py configs/scenario.yaml
+
+The script will:
+1. Load the YAML configuration file
+2. Create an EmpModel and run the line-of-sight simulation
+3. Save results to JSON file (same directory as config)
+4. Generate and save a plot of the EMP intensity vs time
+5. Print summary statistics
+
+Configuration files should contain:
+- model_parameters: weapon yield, pulse parameters, etc.
+- geometry: burst and target coordinates
+- integration_parameters: time range and resolution
+
+See configs/example/basic_line_of_sight.yaml for a complete example.
 """
 
 import argparse
-import os
-import pickle
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from emp.constants import (
-    DEFAULT_A,
-    DEFAULT_HOB,
-    DEFAULT_NUM_TIME_POINTS,
-    DEFAULT_TIME_MAX,
-    DEFAULT_Bnorm,
-    DEFAULT_Compton_KE,
-    DEFAULT_gamma_yield_fraction,
-    DEFAULT_pulse_param_a,
-    DEFAULT_pulse_param_b,
-    DEFAULT_rtol,
-    DEFAULT_theta,
-    DEFAULT_total_yield_kt,
-)
-from emp.geometry import Point
 from emp.model import EmpModel
 
-# Argument parsing
-parser = argparse.ArgumentParser(
-    description="Compute the surface EMP intensity using the Karzas-Latter-Seiler model"
-)
 
-parser.add_argument(
-    "-HOB", default=DEFAULT_HOB, type=float, help="Height of burst [km]"
-)
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Run EMP line-of-sight simulation from YAML config"
+    )
+    parser.add_argument(
+        "config",
+        nargs="?",
+        default="configs/example/basic_line_of_sight.yaml",
+        help="Path to YAML configuration file (default: configs/example/basic_line_of_sight.yaml)",
+    )
+    args = parser.parse_args()
 
-parser.add_argument(
-    "-lat_burst", required=True, type=float, help="Latitude of burst point [deg]"
-)
+    config_path = Path(args.config)
+    if not config_path.exists():
+        print(f"Config file not found: {config_path}")
+        return 1
 
-parser.add_argument(
-    "-lon_burst", required=True, type=float, help="Longitude of burst point [deg]"
-)
+    print(f"Loading configuration from: {config_path}")
 
-parser.add_argument(
-    "-lat_target", required=True, type=float, help="Latitude of target point [deg]"
-)
+    # Load model from YAML config
+    model = EmpModel.from_yaml(config_path)
 
-parser.add_argument(
-    "-lon_target", required=True, type=float, help="Longitude of target point [deg]"
-)
+    # Run the simulation
+    result = model.run()
 
-parser.add_argument(
-    "-Compton_KE",
-    default=DEFAULT_Compton_KE,
-    type=float,
-    help="Kinetic energy of Compton electrons [MeV]",
-)
+    # Save results
+    result_path = config_path.parent / f"{config_path.stem}_result.json"
+    result.save(result_path)
+    print(f"Results saved to: {result_path}")
 
-parser.add_argument(
-    "-total_yield_kt",
-    default=DEFAULT_total_yield_kt,
-    type=float,
-    help="Total weapon yield [kt]",
-)
+    # Print summary
+    print(f"\nSimulation completed:")
+    print(f"Maximum field strength: {result.get_max_field_magnitude():.2e} V/m")
+    print(f"Time of maximum field: {result.get_max_field_time():.2f} ns")
 
-parser.add_argument(
-    "-gamma_yield_fraction",
-    default=DEFAULT_gamma_yield_fraction,
-    type=float,
-    help="Fraction of yield corresponding to prompt gamma rays",
-)
+    # Create plot
+    fig, ax = plt.subplots(1, figsize=(7, 5))
+    ax.plot(
+        result.time_points,
+        result.E_norm_at_ground,
+        "-",
+        color="k",
+        linewidth=1.5,
+    )
+    ax.set_xlabel(r"$\tau$ [ns]")
+    ax.set_ylabel(r"E [V/m]")
+    plt.minorticks_on()
+    plt.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
+    plt.grid(alpha=0.5)
+    plt.title("Surface EMP Intensity")
 
-parser.add_argument(
-    "-pulse_param_a",
-    default=DEFAULT_pulse_param_a,
-    type=float,
-    help="Pulse parameter a [ns^(-1)]",
-)
+    # Save figure
+    figure_path = config_path.parent / "emp_intensity.png"
+    plt.savefig(figure_path, bbox_inches="tight", dpi=600)
+    print(f"Figure saved to: {figure_path}")
+    plt.show()
 
-parser.add_argument(
-    "-pulse_param_b",
-    default=DEFAULT_pulse_param_b,
-    type=float,
-    help="Pulse parameter b [ns^(-1)]",
-)
+    return 0
 
-parser.add_argument(
-    "-rtol",
-    default=DEFAULT_rtol,
-    type=float,
-    help="Relative tolerance used in the ODE integration",
-)
 
-parser.add_argument(
-    "-numerical_integration_method",
-    default="Radau",
-    type=str,
-    help="Numerical integration method to use (see scipy.integrate.solve_ivp for options)",
-)
-
-parser.add_argument(
-    "-magnetic_field_model",
-    default="dipole",
-    type=str,
-    help="Magnetic field model to use (dipole or IGRF)",
-)
-
-parser.add_argument(
-    "-time_max",
-    default=DEFAULT_TIME_MAX,
-    type=float,
-    help="Maximum integration time [ns]",
-)
-
-parser.add_argument(
-    "-num_time_points",
-    default=DEFAULT_NUM_TIME_POINTS,
-    type=int,
-    help="Number of time points to evaluate the solution at",
-)
-
-args = vars(parser.parse_args())
-
-# Construct the burst and target points
-burst_point = Point.from_gps_coordinates(
-    args["lat_burst"], args["lon_burst"], altitude_km=args["HOB"]
-)
-target_point = Point.from_gps_coordinates(
-    args["lat_target"], args["lon_target"], altitude_km=0.0
-)
-
-# Define the model
-model = EmpModel(
-    burst_point=burst_point,
-    target_point=target_point,
-    total_yield_kt=args["total_yield_kt"],
-    gamma_yield_fraction=args["gamma_yield_fraction"],
-    Compton_KE=args["Compton_KE"],
-    pulse_param_a=args["pulse_param_a"],
-    pulse_param_b=args["pulse_param_b"],
-    rtol=args["rtol"],
-    numerical_integration_method=args["numerical_integration_method"],
-    magnetic_field_model=args["magnetic_field_model"],
-)
-
-# Print out param values
-print("\nRunning with parameters\n--------------------")
-for key, value in model.__dict__.items():
-    print(key, ":", value)
-print("\n")
-
-# Perform the integration
-time_points = np.linspace(0, args["time_max"], args["num_time_points"])
-result = model.run(time_points)
-
-# Create data and figure directories
-if not os.path.exists("data"):
-    os.makedirs("data")
-if not os.path.exists("figures"):
-    os.makedirs("figures")
-
-# Save the result
-result.save(filepath="data/emp_solution.json")
-
-# Plot the result
-fig, ax = plt.subplots(1, figsize=(7, 5))
-ax.plot(
-    result.time_points,
-    result.E_norm_at_ground,
-    "-",
-    color="k",
-    linewidth=1.5,
-    markersize=2,
-)
-ax.set_xlabel(r"$\tau$ [ns]")
-ax.set_ylabel(r"E [V/m]")
-plt.minorticks_on()
-plt.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
-plt.grid(alpha=0.5)
-plt.title("Surface EMP Intensity")
-plt.savefig("figures/emp_intensity.png", bbox_inches="tight", dpi=600)
-plt.show()
+if __name__ == "__main__":
+    exit(main())

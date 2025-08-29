@@ -10,6 +10,7 @@ import pytest
 from scipy.integrate._ivp.ivp import OdeResult
 
 from emp.constants import (
+    DEFAULT_NUM_TIME_POINTS,
     EARTH_RADIUS,
     DEFAULT_Compton_KE,
     DEFAULT_gamma_yield_fraction,
@@ -315,20 +316,17 @@ class TestEMPMODEL:
     ) -> None:
         """Test that run returns properly structured EmpLosResult."""
         burst_point, target_point = default_points
-        model = EmpModel(burst_point, target_point)
+        model = EmpModel(burst_point, target_point, num_time_points=10)
 
-        # Use a short time list for faster testing
-        time_points = np.linspace(0, 10, 5)
-
-        result = model.run(time_points)
+        result = model.run()
 
         # Check that it returns EmpLosResult object
         assert isinstance(result, EmpLosResult)
 
         # Check that arrays have correct length
-        assert len(result.E_theta_at_ground) == len(time_points)
-        assert len(result.E_phi_at_ground) == len(time_points)
-        assert len(result.E_norm_at_ground) == len(time_points)
+        assert len(result.E_theta_at_ground) == 10
+        assert len(result.E_phi_at_ground) == 10
+        assert len(result.E_norm_at_ground) == 10
 
         # Check that values are numeric
         for value in result.E_theta_at_ground:
@@ -348,11 +346,10 @@ class TestEMPMODEL:
     ) -> None:
         """Test that EmpLosResult can be saved and loaded."""
         burst_point, target_point = default_points
-        model = EmpModel(burst_point, target_point)
+        model = EmpModel(burst_point, target_point, num_time_points=5)
 
         # Run a quick calculation
-        time_points = np.linspace(0, 5, 3)
-        result = model.run(time_points)
+        result = model.run()
 
         # Test save/load
         with tempfile.TemporaryDirectory() as temp_dir:

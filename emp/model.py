@@ -17,6 +17,7 @@ from typing import (
 )
 
 import numpy as np
+import yaml  # type: ignore
 from numpy.typing import NDArray
 from scipy.integrate import (
     quad,
@@ -156,6 +157,8 @@ class EmpModel:
         rtol: float = DEFAULT_rtol,
         numerical_integration_method: str = "Radau",
         magnetic_field_model: Union[str, MagneticFieldModel] = "dipole",
+        time_max: float = 100.0,
+        num_time_points: int = 300,
     ) -> None:
         """
         Init method.
@@ -191,6 +194,12 @@ class EmpModel:
         magnetic_field_model : Union[str, MagneticFieldModel], optional
             Magnetic field model to use ('dipole' or 'igrf').
             By default 'dipole'.
+        time_max : float, optional
+            Max time to integrate to in ns.
+            By default 100.0 ns.
+        num_time_points : int, optional
+            Number of time points to compute.
+            By default 300.
 
         Yields
         ------
@@ -210,6 +219,11 @@ class EmpModel:
         self.pulse_param_b = pulse_param_b
         self.rtol = rtol
         self.numerical_integration_method = numerical_integration_method
+        self.time_max = time_max
+        self.num_time_points = num_time_points
+
+        # List of time points to evaluate
+        self.time_points = np.linspace(0, self.time_max, self.num_time_points)
 
         # Height of burst from the radius of burst point
         self.HOB = burst_point.r_g - EARTH_RADIUS
@@ -897,17 +911,12 @@ class EmpModel:
         )
         return sol_theta, sol_phi
 
-    def run(self, time_points: NDArray[np.floating]) -> EmpLosResult:
+    def run(self) -> EmpLosResult:
         """
         Solve the KL equations using the Seiler approximations
         for the source terms for a range of retarded times and
         return the angular components of the electric field for
         r = r_target (at the Earth's surface).
-
-        Parameters
-        ----------
-        time_points : NDArray[np.floating]
-            A numpy array of the list of evaluation times.
 
         Returns
         -------
@@ -924,7 +933,7 @@ class EmpModel:
         # E_norm_at_rmax = 0.0
         E_norm_interp: Callable[[float], float] = lambda x: 0.0
 
-        for t in time_points:
+        for t in self.time_points:
             # compute the electron collision freq.
             # nuC_0 = self.electron_collision_freq_at_sea_level(E_norm_at_rmax * self.rmax/self.rtarget, t)
             nuC_0_points = np.asarray(
@@ -965,7 +974,7 @@ class EmpModel:
             np.argmax(np.abs(E_theta_at_ground)),
             np.argmax(np.abs(E_phi_at_ground)),
         )
-        if i_max == len(time_points) - 1:
+        if i_max == len(self.time_points) - 1:
             import warnings
 
             warnings.warn(
@@ -986,10 +995,12 @@ class EmpModel:
             "rtol": self.rtol,
             "numerical_integration_method": self.numerical_integration_method,
             "magnetic_field_model": str(type(self.magnetic_field).__name__),
+            "time_max": self.time_max,
+            "num_time_points": self.num_time_points,
         }
 
         return EmpLosResult(
-            time_points=time_points,
+            time_points=self.time_points,
             E_theta_at_ground=E_theta_at_ground,
             E_phi_at_ground=E_phi_at_ground,
             E_norm_at_ground=E_norm_at_ground,
@@ -1005,3 +1016,125 @@ class EmpModel:
                 "longitude_rad": self.target_point.lambd_g,
             },
         )
+
+    def to_yaml(
+        self,
+        filepath: Union[str, Path],
+    ) -> None:
+        """
+        Export the EmpModel configuration to a YAML file.
+
+        Parameters
+        ----------
+        filepath : Union[str, Path]
+            Path where to save the YAML configuration file.
+        """
+        filepath = Path(filepath)
+
+        config = {
+            "model_parameters": {
+                "total_yield_kt": float(self.total_yield_kt),
+                "gamma_yield_fraction": float(self.gamma_yield_fraction),
+                "Compton_KE": float(self.Compton_KE),
+                "pulse_param_a": float(self.pulse_param_a),
+                "pulse_param_b": float(self.pulse_param_b),
+                "rtol": float(self.rtol),
+                "numerical_integration_method": self.numerical_integration_method,
+                "magnetic_field_model": str(type(self.magnetic_field).__name__)
+                .replace("MagneticField", "")
+                .lower(),
+                "time_max": float(self.time_max),
+                "num_time_points": int(self.num_time_points),
+            },
+            "geometry": {
+                "burst_point": {
+                    "latitude_deg": float(np.degrees(self.burst_point.phi_g)),
+                    "longitude_deg": float(np.degrees(self.burst_point.lambd_g)),
+                    "altitude_km": float(self.HOB),
+                },
+                "target_point": {
+                    "latitude_deg": float(np.degrees(self.target_point.phi_g)),
+                    "longitude_deg": float(np.degrees(self.target_point.lambd_g)),
+                    "altitude_km": float(self.target_point.r_g - EARTH_RADIUS),
+                },
+            },
+        }
+
+        with open(filepath, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False, indent=2)
+
+    @classmethod
+    def from_yaml(cls, filepath: Union[str, Path]) -> "EmpModel":
+        """
+        Create an EmpModel instance from a YAML configuration file.
+
+        Parameters
+        ----------
+        filepath : Union[str, Path]
+            Path to the YAML configuration file.
+
+        Returns
+        -------
+        EmpModel
+            New EmpModel instance configured from the YAML file.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the configuration file doesn't exist.
+        KeyError
+            If required configuration parameters are missing.
+        ValueError
+            If configuration parameters have invalid values.
+        """
+        filepath = Path(filepath)
+
+        if not filepath.exists():
+            raise FileNotFoundError(f"Configuration file not found: {filepath}")
+
+        with open(filepath, "r") as f:
+            config = yaml.safe_load(f)
+
+        # Validate required sections
+        required_sections = ["model_parameters", "geometry"]
+        for section in required_sections:
+            if section not in config:
+                raise KeyError(f"Required section '{section}' missing from config")
+
+        # Extract model parameters
+        model_params = config["model_parameters"]
+        geometry_config = config["geometry"]
+
+        # Create burst point
+        burst_config = geometry_config["burst_point"]
+        burst_point = geometry.Point.from_gps_coordinates(
+            latitude=burst_config["latitude_deg"],
+            longitude=burst_config["longitude_deg"],
+            altitude_km=burst_config["altitude_km"],
+        )
+
+        # Create target point
+        target_config = geometry_config["target_point"]
+        target_point = geometry.Point.from_gps_coordinates(
+            latitude=target_config["latitude_deg"],
+            longitude=target_config["longitude_deg"],
+            altitude_km=target_config.get("altitude_km", 0.0),
+        )
+
+        # Create model instance
+        model = cls(
+            burst_point=burst_point,
+            target_point=target_point,
+            total_yield_kt=model_params["total_yield_kt"],
+            gamma_yield_fraction=model_params["gamma_yield_fraction"],
+            Compton_KE=model_params["Compton_KE"],
+            pulse_param_a=model_params["pulse_param_a"],
+            pulse_param_b=model_params["pulse_param_b"],
+            rtol=model_params["rtol"],
+            numerical_integration_method=model_params["numerical_integration_method"],
+            magnetic_field_model=model_params["magnetic_field_model"],
+            time_max=model_params["time_max"],
+            num_time_points=model_params["num_time_points"],
+        )
+
+        return model
