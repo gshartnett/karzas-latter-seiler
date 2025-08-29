@@ -520,6 +520,13 @@ def get_line_of_sight_midway_point(point_b: Point, point_t: Point) -> Point:
         - EARTH_RADIUS
     )
 
+    # TODO Remove this restriction
+    if HOB < ABSORPTION_LAYER_UPPER:
+        raise ValueError(
+            "Burst height must be above the upper absorption layer "
+            f"({ABSORPTION_LAYER_UPPER} km)"
+        )
+
     # distance from burst point (r=0) to top of absorption layer
     rmin = (HOB - ABSORPTION_LAYER_UPPER) / np.cos(A)
 

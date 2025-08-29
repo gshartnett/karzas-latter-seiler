@@ -3,7 +3,9 @@ Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
 """
 
-import warnings
+import json
+from dataclasses import dataclass
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -14,10 +16,7 @@ from typing import (
     cast,
 )
 
-import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
-from cycler import cycler
 from numpy.typing import NDArray
 from scipy.integrate import (
     quad,
@@ -25,11 +24,11 @@ from scipy.integrate import (
 )
 from scipy.integrate._ivp.ivp import OdeResult
 
+from emp import geometry
 from emp.constants import (
     ABSORPTION_LAYER_LOWER,
     ABSORPTION_LAYER_UPPER,
     AIR_DENSITY_AT_SEA_LEVEL,
-    DEFAULT_A,
     DEFAULT_HOB,
     EARTH_RADIUS,
     ELECTRON_CHARGE,
@@ -46,23 +45,98 @@ from emp.constants import (
     DEFAULT_pulse_param_a,
     DEFAULT_pulse_param_b,
     DEFAULT_rtol,
-    DEFAULT_theta,
     DEFAULT_total_yield_kt,
 )
-
-# plotting settings
-plt.rcParams["xtick.direction"] = "in"
-plt.rcParams["ytick.direction"] = "in"
-plt.rcParams["xtick.major.size"] = 5.0
-plt.rcParams["xtick.minor.size"] = 3.0
-plt.rcParams["ytick.major.size"] = 5.0
-plt.rcParams["ytick.minor.size"] = 3.0
-plt.rc("font", family="serif", size=14)
-matplotlib.rc("text", usetex=True)
-matplotlib.rc("legend", fontsize=14)
-matplotlib.rcParams["axes.prop_cycle"] = cycler(
-    color=["#E24A33", "#348ABD", "#988ED5", "#777777", "#FBC15E", "#8EBA42", "#FFB5B8"]
+from emp.geomagnetic_field import (
+    MagneticFieldFactory,
+    MagneticFieldModel,
 )
+
+
+@dataclass
+class EmpLosResult:
+    """
+    Result dataclass for EMP line-of-sight calculations.
+
+    Contains time series data for electric field components and magnitude
+    at ground level, along with model parameters used for the calculation.
+    """
+
+    tlist: NDArray[np.floating]
+    E_theta_at_ground: List[float]
+    E_phi_at_ground: List[float]
+    E_norm_at_ground: List[float]
+
+    # Store model parameters for reproducibility
+    model_params: Dict[str, Any]
+
+    # Store burst and target point coordinates in geographic lat/long system
+    burst_point_dict: Dict[str, float]
+    target_point_dict: Dict[str, float]
+
+    def save(self, filepath: Union[str, Path]) -> None:
+        """
+        Save the EmpLosResult to a JSON file.
+
+        Parameters
+        ----------
+        filepath : Union[str, Path]
+            Path where to save the result file.
+        """
+        filepath = Path(filepath)
+
+        # Convert numpy arrays to lists for JSON serialization
+        data = {
+            "tlist": self.tlist.tolist(),
+            "E_theta_at_ground": self.E_theta_at_ground,
+            "E_phi_at_ground": self.E_phi_at_ground,
+            "E_norm_at_ground": self.E_norm_at_ground,
+            "model_params": self.model_params,
+            "burst_point_dict": self.burst_point_dict,
+            "target_point_dict": self.target_point_dict,
+        }
+
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def load(cls, filepath: Union[str, Path]) -> "EmpLosResult":
+        """
+        Load an EmpLosResult from a JSON file.
+
+        Parameters
+        ----------
+        filepath : Union[str, Path]
+            Path to the result file to load.
+
+        Returns
+        -------
+        EmpLosResult
+            Loaded result object.
+        """
+        filepath = Path(filepath)
+
+        with open(filepath, "r") as f:
+            data = json.load(f)
+
+        return cls(
+            tlist=np.array(data["tlist"], dtype=np.floating),
+            E_theta_at_ground=data["E_theta_at_ground"],
+            E_phi_at_ground=data["E_phi_at_ground"],
+            E_norm_at_ground=data["E_norm_at_ground"],
+            model_params=data["model_params"],
+            burst_point_dict=data["burst_point_dict"],
+            target_point_dict=data["target_point_dict"],
+        )
+
+    def get_max_field_magnitude(self) -> float:
+        """Get the maximum field magnitude from the result."""
+        return max(self.E_norm_at_ground)
+
+    def get_max_field_time(self) -> float:
+        """Get the time at which maximum field occurs."""
+        max_idx = np.argmax(self.E_norm_at_ground)
+        return float(self.tlist[max_idx])
 
 
 class EmpModel:
@@ -72,23 +146,26 @@ class EmpModel:
 
     def __init__(
         self,
+        burst_point: "geometry.Point",
+        target_point: "geometry.Point",
         total_yield_kt: float = DEFAULT_total_yield_kt,
         gamma_yield_fraction: float = DEFAULT_gamma_yield_fraction,
         Compton_KE: float = DEFAULT_Compton_KE,
-        HOB: float = DEFAULT_HOB,
-        Bnorm: float = DEFAULT_Bnorm,
-        theta: float = DEFAULT_theta,
-        A: float = DEFAULT_A,
         pulse_param_a: float = DEFAULT_pulse_param_a,
         pulse_param_b: float = DEFAULT_pulse_param_b,
         rtol: float = DEFAULT_rtol,
         method: str = "Radau",
+        magnetic_field_model: Union[str, MagneticFieldModel] = "dipole",
     ) -> None:
         """
         Init method.
 
         Parameters
         ----------
+        burst_point : geometry.Point
+            Nuclear burst location.
+        target_point : geometry.Point
+            Target point where EMP effects are calculated.
         total_yield_kt : float, optional
             Total yield in kilotons.
             By default DEFAULT_total_yield_kt.
@@ -98,19 +175,6 @@ class EmpModel:
         Compton_KE : float, optional
             Kinetic energy of Compton electron in MeV.
             By default DEFAULT_Compton_KE.
-        HOB : float, optional
-            Height of burst in km.
-            By default DEFAULT_HOB.
-        Bnorm : float, optional
-            Geomagnetic field strength in Teslas.
-            By default, DEFAULT_Bnorm.
-        theta : float, optional
-            Angle between line of sight vector and magnetic field in radians.
-            By default, DEFAULT_theta.
-        A : float, optional
-            Angle between radial ray from burst point to target and normal
-            in radians.
-            By default, DEFAULT_A.
         pulse_param_a : float, optional
             Pulse parameter in 1/ns.
             By default, DEFAULT_pulse_param_a.
@@ -124,6 +188,9 @@ class EmpModel:
             Integration method used for solve_ivp.
             By default, 'Radau', which is well-suited
             for stiff problems.
+        magnetic_field_model : Union[str, MagneticFieldModel], optional
+            Magnetic field model to use ('dipole' or 'igrf').
+            By default 'dipole'.
 
         Yields
         ------
@@ -131,20 +198,41 @@ class EmpModel:
             No returns.
         """
 
-        # variable input parameters
+        # Store input points
+        self.burst_point = burst_point
+        self.target_point = target_point
+
+        # Variable input parameters
         self.total_yield_kt = total_yield_kt
         self.gamma_yield_fraction = gamma_yield_fraction
         self.Compton_KE = Compton_KE
-        self.HOB = HOB
-        self.Bnorm = Bnorm
-        self.theta = theta
-        self.A = A
         self.pulse_param_a = pulse_param_a
         self.pulse_param_b = pulse_param_b
         self.rtol = rtol
         self.method = method
 
-        # secondary/derivative parameters
+        # Height of burst from the radius of burst point
+        self.HOB = burst_point.r_g - EARTH_RADIUS
+
+        # Check line of sight
+        geometry.line_of_sight_check(burst_point, target_point)
+
+        # Calculate midway point for magnetic field calculations
+        self.midway_point = geometry.get_line_of_sight_midway_point(
+            burst_point, target_point
+        )
+
+        # Calculate geometric angle A
+        self.A = geometry.get_A_angle(burst_point, self.midway_point)
+
+        # Initialize magnetic field model and calculate theta, Bnorm
+        self.magnetic_field = MagneticFieldFactory.create(magnetic_field_model)
+        self.theta = self.magnetic_field.get_theta_angle(
+            point_burst=burst_point, point_los=self.midway_point
+        )
+        self.Bnorm = self.magnetic_field.get_field_magnitude(self.midway_point)
+
+        # Secondary/derivative parameters
         # max A angle (line of sight is tangent to horizon)
         self.Amax = np.arcsin(EARTH_RADIUS / (EARTH_RADIUS + self.HOB))
 
@@ -773,7 +861,7 @@ class EmpModel:
         )
         return result
 
-    def ODE_solve(
+    def solve_KL_ODEs(
         self, t: float, nuC_0: Callable[[float], float]
     ) -> Tuple[OdeResult, OdeResult]:
         """
@@ -809,9 +897,7 @@ class EmpModel:
         )
         return sol_theta, sol_phi
 
-    def solver(
-        self, tlist: NDArray[np.floating]
-    ) -> Dict[str, Union[NDArray[np.floating], List[float]]]:
+    def run(self, tlist: NDArray[np.floating]) -> EmpLosResult:
         """
         Solve the KL equations using the Seiler approximations
         for the source terms for a range of retarded times and
@@ -825,17 +911,15 @@ class EmpModel:
 
         Returns
         -------
-        Dict[str, Union[NDArray[np.floating], List[float]]]
-            A dictionary containing time series of the components
+        EmpLosResult
+            Result object containing time series of the components
             and norm of the E-field evaluated at a target point
             on the Earth's surface.
         """
-        out: Dict[str, Union[NDArray[np.floating], List[float]]] = {
-            "tlist": tlist,
-            "E_theta_at_ground": [],
-            "E_phi_at_ground": [],
-            "E_norm_at_ground": [],
-        }
+        E_theta_at_ground: List[float] = []
+        E_phi_at_ground: List[float] = []
+        E_norm_at_ground: List[float] = []
+
         rlist = np.linspace(self.rmin, self.rmax, 200)
         # E_norm_at_rmax = 0.0
         E_norm_interp: Callable[[float], float] = lambda x: 0.0
@@ -854,7 +938,7 @@ class EmpModel:
             )
 
             # solve the KL equations
-            sol_theta, sol_phi = self.ODE_solve(t, nuC_0)
+            sol_theta, sol_phi = self.solve_KL_ODEs(t, nuC_0)
 
             # build an interpolation of E_norm(r)
             E_theta_interp: Callable[[float], float] = lambda x: np.interp(
@@ -868,11 +952,9 @@ class EmpModel:
             )
 
             # record the value at rmax
-            out["E_theta_at_ground"].append(
-                sol_theta.y[0, -1] * self.rmax / self.rtarget
-            )
-            out["E_phi_at_ground"].append(sol_phi.y[0, -1] * self.rmax / self.rtarget)
-            out["E_norm_at_ground"].append(
+            E_theta_at_ground.append(sol_theta.y[0, -1] * self.rmax / self.rtarget)
+            E_phi_at_ground.append(sol_phi.y[0, -1] * self.rmax / self.rtarget)
+            E_norm_at_ground.append(
                 np.sqrt(sol_theta.y[0, -1] ** 2 + sol_phi.y[0, -1] ** 2)
                 * self.rmax
                 / self.rtarget
@@ -880,12 +962,46 @@ class EmpModel:
 
         # check that the time of max EMP intensity is not the last time considered
         i_max = max(
-            np.argmax(np.abs(out["E_theta_at_ground"])),
-            np.argmax(np.abs(out["E_phi_at_ground"])),
+            np.argmax(np.abs(E_theta_at_ground)),
+            np.argmax(np.abs(E_phi_at_ground)),
         )
         if i_max == len(tlist) - 1:
+            import warnings
+
             warnings.warn(
                 "Warning, evolution terminated before max EMP intensity has been reached."
             )
 
-        return out
+        # Store model parameters for reproducibility
+        model_params = {
+            "total_yield_kt": self.total_yield_kt,
+            "gamma_yield_fraction": self.gamma_yield_fraction,
+            "Compton_KE": self.Compton_KE,
+            "HOB": self.HOB,
+            "Bnorm": self.Bnorm,
+            "theta": self.theta,
+            "A": self.A,
+            "pulse_param_a": self.pulse_param_a,
+            "pulse_param_b": self.pulse_param_b,
+            "rtol": self.rtol,
+            "method": self.method,
+            "magnetic_field_model": str(type(self.magnetic_field).__name__),
+        }
+
+        return EmpLosResult(
+            tlist=tlist,
+            E_theta_at_ground=E_theta_at_ground,
+            E_phi_at_ground=E_phi_at_ground,
+            E_norm_at_ground=E_norm_at_ground,
+            model_params=model_params,
+            burst_point_dict={
+                "radius_km": self.burst_point.r_g,
+                "latitude_rad": self.burst_point.phi_g,
+                "longitude_rad": self.burst_point.lambd_g,
+            },
+            target_point_dict={
+                "radius_km": self.target_point.r_g,
+                "latitude_rad": self.target_point.phi_g,
+                "longitude_rad": self.target_point.lambd_g,
+            },
+        )
