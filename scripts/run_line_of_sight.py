@@ -126,10 +126,10 @@ args = vars(parser.parse_args())
 
 # Construct the burst and target points
 burst_point = Point.from_gps_coordinates(
-    args["lat_burst"], args["lon_burst"], altitude_m=args["HOB"]
+    args["lat_burst"], args["lon_burst"], altitude_km=args["HOB"]
 )
 target_point = Point.from_gps_coordinates(
-    args["lat_target"], args["lon_target"], altitude_m=0.0
+    args["lat_target"], args["lon_target"], altitude_km=0.0
 )
 
 # Define the model

@@ -224,7 +224,7 @@ class Point:
         cls,
         latitude: Union[float, str],
         longitude: Union[float, str],
-        altitude_m: float = 0.0,
+        altitude_km: float = 0.0,
     ) -> "Point":
         """
         Create a Point from GPS-style coordinates.
@@ -235,8 +235,8 @@ class Point:
             Latitude in degrees (e.g. 40.7128) or as a string with N/S suffix.
         longitude : float | str
             Longitude in degrees (e.g. -74.0060) or as a string with E/W suffix.
-        altitude_m : float
-            Altitude above mean sea level in meters.
+        altitude_km : float
+            Altitude above mean sea level in kilometers.
 
         Returns
         -------
@@ -262,7 +262,7 @@ class Point:
         lat_deg = parse_coord(latitude, True)
         lon_deg = parse_coord(longitude, False)
 
-        r = EARTH_RADIUS + altitude_m
+        r = EARTH_RADIUS + altitude_km
         phi = np.radians(lat_deg)  # latitude in radians
         lambd = np.radians(lon_deg)  # longitude in radians
 

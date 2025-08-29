@@ -423,10 +423,10 @@ def test_from_gps_coordinates_and_distance() -> None:
     """
 
     # New York City (approx)
-    nyc = Point.from_gps_coordinates(40.7128, -74.0060, altitude_m=10)
+    nyc = Point.from_gps_coordinates(40.7128, -74.0060, altitude_km=10)
 
     # London (approx)
-    london = Point.from_gps_coordinates(51.5074, -0.1278, altitude_m=15)
+    london = Point.from_gps_coordinates(51.5074, -0.1278, altitude_km=15)
 
     # Known great-circle distance ~ 5570 km
     distance = great_circle_distance(nyc, london)
