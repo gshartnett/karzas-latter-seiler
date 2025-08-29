@@ -3,7 +3,10 @@ Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
 """
 
-from typing import Tuple
+from typing import (
+    Tuple,
+    Union,
+)
 
 import numpy as np
 from numpy.typing import NDArray
@@ -215,6 +218,55 @@ class Point:
         return hash(
             (round(self.r_g, 10), round(self.phi_g, 10), round(self.lambd_g, 10))
         )
+
+    @classmethod
+    def from_gps_coordinates(
+        cls,
+        latitude: Union[float, str],
+        longitude: Union[float, str],
+        altitude_m: float = 0.0,
+    ) -> "Point":
+        """
+        Create a Point from GPS-style coordinates.
+
+        Parameters
+        ----------
+        latitude : float | str
+            Latitude in degrees (e.g. 40.7128) or as a string with N/S suffix.
+        longitude : float | str
+            Longitude in degrees (e.g. -74.0060) or as a string with E/W suffix.
+        altitude_m : float
+            Altitude above mean sea level in meters.
+
+        Returns
+        -------
+        Point
+            A Point object in geographic lat/long coordinates.
+        """
+
+        # If inputs are strings like "40.7N", "74W", handle parsing:
+        def parse_coord(coord: Union[float, str], is_lat: bool) -> float:
+            if isinstance(coord, (int, float)):
+                return float(coord)
+            c = coord.strip().upper()
+            if c.endswith("N") and is_lat:
+                return float(c[:-1])
+            if c.endswith("S") and is_lat:
+                return -float(c[:-1])
+            if c.endswith("E") and not is_lat:
+                return float(c[:-1])
+            if c.endswith("W") and not is_lat:
+                return -float(c[:-1])
+            return float(c)
+
+        lat_deg = parse_coord(latitude, True)
+        lon_deg = parse_coord(longitude, False)
+
+        r = EARTH_RADIUS + altitude_m
+        phi = np.radians(lat_deg)  # latitude in radians
+        lambd = np.radians(lon_deg)  # longitude in radians
+
+        return cls(r, phi, lambd, coordsys="lat/long geo")
 
     @staticmethod
     def validate_latlong_coords(r: float, phi: float, lambd: float) -> None:

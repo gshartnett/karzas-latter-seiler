@@ -13,6 +13,7 @@ from emp.geometry import (
     compute_max_delta_angle_1d,
     compute_max_delta_angle_2d,
     get_rotation_matrix,
+    great_circle_distance,
 )
 
 
@@ -414,3 +415,20 @@ class TestCoordinateConversions:
             np.testing.assert_allclose(
                 [r_g, phi_g, lambd_g], [r_g2, phi_g2, lambd_g2], atol=tol
             )
+
+
+def test_from_gps_coordinates_and_distance() -> None:
+    """
+    Check that from_gps_coordinates + great_circle_distance is reasonable.
+    """
+
+    # New York City (approx)
+    nyc = Point.from_gps_coordinates(40.7128, -74.0060, altitude_m=10)
+
+    # London (approx)
+    london = Point.from_gps_coordinates(51.5074, -0.1278, altitude_m=15)
+
+    # Known great-circle distance ~ 5570 km
+    distance = great_circle_distance(nyc, london)
+    print(distance)
+    assert pytest.approx(distance, rel=0.01) == 5570  # within 1%
