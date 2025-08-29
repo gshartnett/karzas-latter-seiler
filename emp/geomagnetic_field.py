@@ -56,7 +56,7 @@ class MagneticField(ABC):
     @abstractmethod
     def get_field_vector(
         self, point: Point, coordinate_system: CoordinateSystem
-    ) -> NDArray[np.floating]:
+    ) -> NDArray[np.float64]:
         """Get magnetic field vector in the specified coordinate system."""
         pass
 
@@ -89,7 +89,7 @@ class DipoleMagneticField(MagneticField):
 
     def get_field_vector(
         self, point: Point, coordinate_system: CoordinateSystem
-    ) -> NDArray[np.floating]:
+    ) -> NDArray[np.float64]:
         """Get magnetic field vector in the specified coordinate system."""
 
         if coordinate_system == CoordinateSystem.LATLONG_MAG:
@@ -97,7 +97,7 @@ class DipoleMagneticField(MagneticField):
             B_r = -2 * B0 * (EARTH_RADIUS / point.r_m) ** 3 * np.sin(point.phi_m)
             B_phi = B0 * (EARTH_RADIUS / point.r_m) ** 3 * np.cos(point.phi_m)
             B_lambd = 0.0
-            return np.asarray([B_r, B_phi, B_lambd], dtype=np.floating)
+            return np.asarray([B_r, B_phi, B_lambd], dtype=np.float64)
 
         elif coordinate_system == CoordinateSystem.CARTESIAN_MAG:
             # Get magnetic lat/long components first
@@ -122,13 +122,13 @@ class DipoleMagneticField(MagneticField):
             lambd_hat = -np.sin(point.lambd_m) * x_hat + np.cos(point.lambd_m) * y_hat
 
             result = B_r * r_hat + B_phi * phi_hat + B_lambd * lambd_hat
-            return np.asarray(result, dtype=np.floating)
+            return np.asarray(result, dtype=np.float64)
 
         elif coordinate_system == CoordinateSystem.CARTESIAN_GEO:
             # Get magnetic Cartesian first, then rotate to geographic
             B_vec_m = self.get_field_vector(point, CoordinateSystem.CARTESIAN_MAG)
             B_vec_g = np.dot(ROTATION_MATRIX, B_vec_m)
-            return np.asarray(B_vec_g, dtype=np.floating)
+            return np.asarray(B_vec_g, dtype=np.float64)
 
         elif coordinate_system == CoordinateSystem.SPHERICAL_GEO:
             # Get geographic Cartesian first, then convert to spherical
@@ -160,7 +160,7 @@ class DipoleMagneticField(MagneticField):
             B_theta = np.dot(B_vec_geo, theta_hat)
             B_phi_az = np.dot(B_vec_geo, phi_hat)
 
-            return np.asarray([B_r, B_theta, B_phi_az], dtype=np.floating)
+            return np.asarray([B_r, B_theta, B_phi_az], dtype=np.float64)
 
         else:
             raise ValueError(f"Unsupported coordinate system: {coordinate_system}")
@@ -200,7 +200,7 @@ class IGRFMagneticField(MagneticField):
 
     def get_field_vector(
         self, point: Point, coordinate_system: CoordinateSystem
-    ) -> NDArray[np.floating]:
+    ) -> NDArray[np.float64]:
         """Get magnetic field vector in the specified coordinate system."""
 
         if coordinate_system == CoordinateSystem.SPHERICAL_GEO:
@@ -218,7 +218,7 @@ class IGRFMagneticField(MagneticField):
             B_theta = float(B_theta.flatten()[0]) * 1e-9
             B_phi_az = float(B_phi_az.flatten()[0]) * 1e-9
 
-            return np.asarray([B_r, B_theta, B_phi_az], dtype=np.floating)
+            return np.asarray([B_r, B_theta, B_phi_az], dtype=np.float64)
 
         elif coordinate_system == CoordinateSystem.CARTESIAN_GEO:
             # Get spherical first, then convert to Cartesian
@@ -246,13 +246,13 @@ class IGRFMagneticField(MagneticField):
             phi_hat = -np.sin(phi_azimuthal) * x_hat + np.cos(phi_azimuthal) * y_hat
 
             result = B_r * r_hat + B_theta * theta_hat + B_phi_az * phi_hat
-            return np.asarray(result, dtype=np.floating)
+            return np.asarray(result, dtype=np.float64)
 
         elif coordinate_system == CoordinateSystem.CARTESIAN_MAG:
             # Get geographic Cartesian first, then rotate to magnetic
             B_vec_geo = self.get_field_vector(point, CoordinateSystem.CARTESIAN_GEO)
             B_vec_mag = np.dot(INV_ROTATION_MATRIX, B_vec_geo)
-            return np.asarray(B_vec_mag, dtype=np.floating)
+            return np.asarray(B_vec_mag, dtype=np.float64)
 
         elif coordinate_system == CoordinateSystem.LATLONG_MAG:
             # Not directly available - would need complex conversion

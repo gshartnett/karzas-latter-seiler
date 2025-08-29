@@ -63,7 +63,7 @@ class EmpLosResult:
     at ground level, along with model parameters used for the calculation.
     """
 
-    time_points: NDArray[np.floating]
+    time_points: NDArray[np.float64]
     E_theta_at_ground: List[float]
     E_phi_at_ground: List[float]
     E_norm_at_ground: List[float]
@@ -121,7 +121,7 @@ class EmpLosResult:
             data = json.load(f)
 
         return cls(
-            time_points=np.array(data["time_points"], dtype=np.floating),
+            time_points=np.array(data["time_points"], dtype=np.float64),
             E_theta_at_ground=data["E_theta_at_ground"],
             E_phi_at_ground=data["E_phi_at_ground"],
             E_norm_at_ground=data["E_norm_at_ground"],
@@ -333,9 +333,7 @@ class EmpModel:
         T = (1 - self.beta) * T
         return float(T)
 
-    def f_pulse(
-        self, t: Union[float, np.ndarray]
-    ) -> Union[float, NDArray[np.floating]]:
+    def f_pulse(self, t: Union[float, np.ndarray]) -> Union[float, NDArray[np.float64]]:
         """
         Normalized gamma pulse, for the difference of exponential form
         used by Seiler. This parameterization of the pulse profile has
@@ -366,7 +364,7 @@ class EmpModel:
 
     def rho_divided_by_rho0(
         self, r: Union[float, np.ndarray]
-    ) -> Union[float, NDArray[np.floating]]:
+    ) -> Union[float, NDArray[np.float64]]:
         """
         Ratio of air density at radius r to air density at sea level.
 
@@ -385,7 +383,7 @@ class EmpModel:
 
     def mean_free_path(
         self, r: Union[float, np.ndarray]
-    ) -> Union[float, NDArray[np.floating]]:
+    ) -> Union[float, NDArray[np.float64]]:
         """
         Compton electron mean free path.
 
@@ -404,7 +402,7 @@ class EmpModel:
 
     def gCompton(
         self, r: Union[float, np.ndarray]
-    ) -> Union[float, NDArray[np.floating]]:
+    ) -> Union[float, NDArray[np.float64]]:
         """
         The g function for the creation of primary electrons, as introduced
         in Karzas, Latter Eq (4).
@@ -437,7 +435,7 @@ class EmpModel:
 
     def gCompton_numerical_integration(
         self, r: Union[float, np.ndarray]
-    ) -> Union[float, NDArray[np.floating]]:
+    ) -> Union[float, NDArray[np.float64]]:
         """
         The g function for the creation of primary electrons
         The radius is measured from the burst.
@@ -453,7 +451,7 @@ class EmpModel:
 
         Returns
         -------
-        Union[float, NDArray[np.floating]]
+        Union[float, NDArray[np.float64]]
             Compton g function, in km^(-3)
         """
         r_array = np.asarray(r)

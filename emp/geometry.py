@@ -20,7 +20,7 @@ from emp.constants import (
 )
 
 
-def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.floating]:
+def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.float64]:
     """
     Rotation matrix for angle theta and axis (vx, vy, vz).
     https://en.wikipedia.org/wiki/Rotation_matrix#Conversion_from_rotation_matrix_to_axis%E2%80%93angle
@@ -32,7 +32,7 @@ def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.floating]:
 
     Returns
     -------
-    NDArray[np.floating]
+    NDArray[np.float64]
         Rotation matrix.
     """
     if len(axis) != 3:
@@ -42,7 +42,7 @@ def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.floating]:
     vec_x, vec_y, vec_z = axis / np.linalg.norm(axis)
 
     # Build the rotation matrix
-    rotation_matrix: NDArray[np.floating] = np.zeros((3, 3))
+    rotation_matrix: NDArray[np.float64] = np.zeros((3, 3))
 
     rotation_matrix[0, 0] = np.cos(theta) + vec_x**2 * (1 - np.cos(theta))
     rotation_matrix[0, 1] = vec_x * vec_y * (1 - np.cos(theta)) - vec_z * np.sin(theta)
@@ -467,7 +467,7 @@ def _cartesian_to_spherical(x: float, y: float, z: float) -> Tuple[float, float,
     return r, theta, phi
 
 
-def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point) -> NDArray[np.floating]:
+def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point) -> NDArray[np.float64]:
     """
     Compute the vector pointing from A to B in geographic cartesian
     coordinates.
@@ -481,13 +481,13 @@ def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point) -> NDArray[np.floating]
 
     Returns
     -------
-    NDArray[np.floating]
+    NDArray[np.float64]
         The vector pointing from point A to point B.
     """
-    xvec_g_from_O_to_A: NDArray[np.floating] = np.asarray(
+    xvec_g_from_O_to_A: NDArray[np.float64] = np.asarray(
         [pointA.x_g, pointA.y_g, pointA.z_g]
     )
-    xvec_g_from_O_to_B: NDArray[np.floating] = np.asarray(
+    xvec_g_from_O_to_B: NDArray[np.float64] = np.asarray(
         [pointB.x_g, pointB.y_g, pointB.z_g]
     )
     return xvec_g_from_O_to_B - xvec_g_from_O_to_A
