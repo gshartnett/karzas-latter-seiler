@@ -154,7 +154,7 @@ class EmpModel:
         pulse_param_a: float = DEFAULT_pulse_param_a,
         pulse_param_b: float = DEFAULT_pulse_param_b,
         rtol: float = DEFAULT_rtol,
-        method: str = "Radau",
+        numerical_integration_method: str = "Radau",
         magnetic_field_model: Union[str, MagneticFieldModel] = "dipole",
     ) -> None:
         """
@@ -184,7 +184,7 @@ class EmpModel:
         rtol : float, optional
             Relative tolerance for ODE integration.
             By default, DEFAULT_rtol.
-        method : str, optional
+        numerical_integration_method : str, optional
             Integration method used for solve_ivp.
             By default, 'Radau', which is well-suited
             for stiff problems.
@@ -209,7 +209,7 @@ class EmpModel:
         self.pulse_param_a = pulse_param_a
         self.pulse_param_b = pulse_param_b
         self.rtol = rtol
-        self.method = method
+        self.numerical_integration_method = numerical_integration_method
 
         # Height of burst from the radius of burst point
         self.HOB = burst_point.r_g - EARTH_RADIUS
@@ -885,14 +885,14 @@ class EmpModel:
             lambda r, e: self.F_theta_Seiler(e, r, t, nuC_0),
             [self.rmin, self.rmax],
             [0],
-            method=self.method,
+            method=self.numerical_integration_method,
             rtol=self.rtol,
         )
         sol_phi = solve_ivp(
             lambda r, e: self.F_phi_Seiler(e, r, t, nuC_0),
             [self.rmin, self.rmax],
             [0],
-            method=self.method,
+            method=self.numerical_integration_method,
             rtol=self.rtol,
         )
         return sol_theta, sol_phi
@@ -984,7 +984,7 @@ class EmpModel:
             "pulse_param_a": self.pulse_param_a,
             "pulse_param_b": self.pulse_param_b,
             "rtol": self.rtol,
-            "method": self.method,
+            "numerical_integration_method": self.numerical_integration_method,
             "magnetic_field_model": str(type(self.magnetic_field).__name__),
         }
 

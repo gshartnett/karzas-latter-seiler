@@ -95,10 +95,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "-method",
+    "-numerical_integration_method",
     default="Radau",
     type=str,
-    help="Integration method to use (see scipy.integrate.solve_ivp for options)",
+    help="Numerical integration method to use (see scipy.integrate.solve_ivp for options)",
 )
 
 parser.add_argument(
@@ -142,14 +142,14 @@ model = EmpModel(
     pulse_param_a=args["pulse_param_a"],
     pulse_param_b=args["pulse_param_b"],
     rtol=args["rtol"],
-    method=args["method"],
+    numerical_integration_method=args["numerical_integration_method"],
     magnetic_field_model=args["magnetic_field_model"],
 )
 
 # Print out param values
 print("\nRunning with parameters\n--------------------")
 for key, value in model.__dict__.items():
-    print(key, "=", value)
+    print(key, ":", value)
 print("\n")
 
 # Perform the integration

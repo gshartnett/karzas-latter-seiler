@@ -50,6 +50,9 @@ class MagneticFieldModel(Enum):
 class MagneticField(ABC):
     """Abstract base class for magnetic field models."""
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
+
     @abstractmethod
     def get_field_vector(
         self, point: Point, coordinate_system: CoordinateSystem

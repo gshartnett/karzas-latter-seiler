@@ -11,7 +11,7 @@ Simulate the effects of a high-altitude EMP.
 In this case, the detonation occurs over New York City (40.7128° N, 74.0060° W)
 and the target is Washington, D.C. (38.9072° N, 77.0369° W).
 
-.. code-block:: python
+.. code-block:: bash
 
 python scripts/run_line_of_sight.py -lat_burst=40.7128 -lon_burst=-74.0060 -lat_target=38.9072 -lon_target=-77.0369
 
