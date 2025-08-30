@@ -816,29 +816,30 @@ def compute_max_delta_angle_2d(
         raise ValueError("Tolerance must be positive")
 
     def _test_delta_angle_2d(delta_angle: float) -> bool:
-        """Test if all points in 2D lat/long grid have line-of-sight."""
         offsets = np.linspace(-delta_angle / 2, delta_angle / 2, n_grid_points)
         phi_targets = burst_point.phi_g + offsets
-        lambd_targets = burst_point.lambd_g + offsets
+        lambd_targets = ((burst_point.lambd_g + offsets + np.pi) % (2 * np.pi)) - np.pi
 
-        for phi_target in phi_targets:
-            # Check latitude bounds
+        def check(phi_target: float, lambd_target: float) -> bool:
             if not (-np.pi / 2 <= phi_target <= np.pi / 2):
                 return False
+            try:
+                target_point = Point(
+                    EARTH_RADIUS, phi_target, lambd_target, coordsys="lat/long geo"
+                )
+                line_of_sight_check(burst_point, target_point)
+                return True
+            except ValueError:
+                return False
 
-            for lambd_target in lambd_targets:
-                try:
-                    # Normalize longitude to [-π, π)
-                    lambd_normalized = ((lambd_target + np.pi) % (2 * np.pi)) - np.pi
-
-                    target_point = Point(
-                        EARTH_RADIUS,
-                        phi_target,
-                        lambd_normalized,
-                        coordsys="lat/long geo",
-                    )
-                    line_of_sight_check(burst_point, target_point)
-                except ValueError:
+        # Only check perimeter
+        for phi in (phi_targets[0], phi_targets[-1]):
+            for lambd in lambd_targets:
+                if not check(phi, lambd):
+                    return False
+        for phi in phi_targets[1:-1]:
+            for lambd in (lambd_targets[0], lambd_targets[-1]):
+                if not check(phi, lambd):
                     return False
         return True
 
