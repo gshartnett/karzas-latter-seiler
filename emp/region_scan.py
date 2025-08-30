@@ -21,12 +21,14 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import numpy as np
 import scipy.ndimage
+import yaml  # type: ignore
 from cycler import cycler
 from numpy.typing import NDArray
 from PIL import Image
 from tqdm import tqdm
 
 import emp.geometry as geometry
+from emp.config import generate_configs
 from emp.constants import (
     DEFAULT_HOB,
     EARTH_RADIUS,
@@ -38,6 +40,7 @@ from emp.constants import (
     DEFAULT_total_yield_kt,
 )
 from emp.geomagnetic_field import MagneticFieldFactory
+from emp.geometry import Point
 from emp.model import EmpModel
 
 # Configure matplotlib
@@ -127,7 +130,7 @@ def contour_plot(
     x: NDArray[np.floating],
     y: NDArray[np.floating],
     z: NDArray[np.floating],
-    burst_point: geometry.Point,
+    burst_point: Point,
     save_path: Optional[str] = None,
     show_grid: bool = False,
     show: bool = True,
@@ -143,7 +146,7 @@ def contour_plot(
         Latitude coordinates in degrees.
     z : NDArray[np.floating]
         Field strength values.
-    burst_point : geometry.Point
+    burst_point : Point
         Burst location for line-of-sight calculations.
     save_path : Optional[str], optional
         Path to save the figure, by default None.
@@ -175,7 +178,7 @@ def contour_plot(
         for j, latitude in enumerate(yi):
             phi = latitude * np.pi / 180
             lambd = longitude * np.pi / 180
-            target_point = geometry.Point(EARTH_RADIUS, phi, lambd, "lat/long geo")
+            target_point = Point(EARTH_RADIUS, phi, lambd, "lat/long geo")
             try:
                 geometry.line_of_sight_check(burst_point, target_point)
             except Exception:
@@ -306,8 +309,63 @@ def _save_map_as_image(geomap: folium.Map, save_path: str) -> None:
     cropped.convert("RGB").save(save_path, dpi=(300, 300))
 
 
+def region_scan_new(
+    base_config_path: str,
+    scan_name: str,
+    num_points_phi: int = 20,
+    num_points_lambda: int = 20,
+) -> None:
+    # Load base config
+    with open(base_config_path, "r") as f:
+        base_config = yaml.safe_load(f)
+
+    # Extract burst point from base config
+    burst_cfg = base_config["geometry"]["burst_point"]
+
+    burst_point = Point.from_gps_coordinates(
+        latitude=burst_cfg["latitude_deg"],
+        longitude=burst_cfg["longitude_deg"],
+        altitude_km=burst_cfg["altitude_km"],
+    )
+
+    # Identify grid of angular values
+    delta_angle = 2.0 * geometry.compute_max_delta_angle_2d(burst_point)
+    print(f"Delta angle: {delta_angle:.6f} radians")
+
+    lat_1d_grid = burst_point.phi_g + np.linspace(
+        -delta_angle / 2, delta_angle / 2, num_points_phi
+    )
+    long_1d_grid = burst_point.lambd_g + np.linspace(
+        -delta_angle / 2, delta_angle / 2, num_points_lambda
+    )
+
+    # Convert to list of degrees
+    lat_1d_grid = ((180 / np.pi) * lat_1d_grid).tolist()
+    long_1d_grid = ((180 / np.pi) * long_1d_grid).tolist()
+
+    # Cartesian product → 2 1D arrays
+    # lat_grid, long_grid = np.meshgrid(lat_1d_grid, long_1d_grid, indexing="ij")
+    # lat_values = lat_grid.ravel().to_list()
+    # long_values = long_grid.ravel().to_list()
+
+    # Create all config files
+    generate_configs(
+        base_config_path=base_config_path,
+        scan_name=scan_name,
+        parameters={
+            "latitude": lat_1d_grid,
+            "longitude": long_1d_grid,
+        },
+        output_dir=f"configs/{scan_name}",
+    )
+
+    # Run all config files
+
+    return
+
+
 def region_scan(
-    burst_point: geometry.Point,
+    burst_point: Point,
     HOB: float = DEFAULT_HOB,
     Compton_KE: float = DEFAULT_Compton_KE,
     total_yield_kt: float = DEFAULT_total_yield_kt,
@@ -329,7 +387,7 @@ def region_scan(
 
     Parameters
     ----------
-    burst_point : geometry.Point
+    burst_point : Point
         Location of the nuclear burst.
     HOB : float, optional
         Height of burst in km, by default DEFAULT_HOB.
@@ -390,7 +448,7 @@ def region_scan(
     for i in tqdm(range(N_pts_phi), desc="Latitude"):
         for j in tqdm(range(N_pts_lambd), desc="Longitude", leave=(i == N_pts_phi - 1)):
             # Define target point
-            target_point = geometry.Point(
+            target_point = Point(
                 EARTH_RADIUS, phi_grid[i], lambd_grid[j], "lat/long geo"
             )
             midway_point = geometry.get_line_of_sight_midway_point(

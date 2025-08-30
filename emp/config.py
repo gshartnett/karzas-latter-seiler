@@ -118,31 +118,8 @@ def generate_configs(
         # Copy base config
         config = base_config.copy()
 
-        # Apply parameter values using dot notation
-        filename_parts = [scan_name]
-        for param_name, value in zip(param_names, combination):
-            # Navigate to nested parameter using dot notation
-            keys = param_name.split(".")
-            current = config
-            for key in keys[:-1]:
-                if key not in current:
-                    current[key] = {}
-                current = current[key]
-
-            # Set the parameter value
-            current[keys[-1]] = value
-
-            # Build filename component
-            param_key = keys[-1]
-            if isinstance(value, float):
-                filename_parts.append(f"{param_key}{value:.3f}")
-            elif isinstance(value, str):
-                filename_parts.append(f"{param_key}{value}")
-            else:
-                filename_parts.append(f"{param_key}{value}")
-
         # Create filename
-        filename = "_".join(filename_parts) + f"_{i:03d}.yaml"
+        filename = f"{scan_name}_config_{i:04d}.yaml"
         config_path = output_dir / filename
 
         # Save configuration
