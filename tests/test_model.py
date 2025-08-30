@@ -519,3 +519,46 @@ def test_conductivity_methods_comparable() -> None:
 
 
 ## ADD a test when target lies b/w the absorption layers
+
+
+def test_dipole_model_with_date_raises_error() -> None:
+    """Test that dipole model raises error if date is provided."""
+    burst_point = Point(EARTH_RADIUS + 100, 0.0, 0.0, "lat/long geo")
+    target_point = Point(EARTH_RADIUS, 0.1, 0.0, "lat/long geo")
+
+    with pytest.raises(ValueError):
+        EmpModel(
+            burst_point,
+            target_point,
+            magnetic_field_model="dipole",
+            magnetic_field_date="2023-01-01",
+        )
+
+
+def test_igrf_model_with_date() -> None:
+    """Test that IGRF model works with date."""
+    burst_point = Point(EARTH_RADIUS + 100, 0.0, 0.0, "lat/long geo")
+    target_point = Point(EARTH_RADIUS, 0.1, 0.0, "lat/long geo")
+
+    model1 = EmpModel(
+        burst_point,
+        target_point,
+        magnetic_field_model="igrf",
+        magnetic_field_date="2023-01-01",
+    )
+
+    model2 = EmpModel(
+        burst_point,
+        target_point,
+        magnetic_field_model="igrf",
+        magnetic_field_date="1970-01-01",
+    )
+
+    point = Point(EARTH_RADIUS, 0.0, 0.0, "lat/long geo")
+    Bfield_1 = model1.magnetic_field.get_field_magnitude(point)
+    Bfield_2 = model2.magnetic_field.get_field_magnitude(point)
+
+    # check that the magnetic field values are different
+    assert not np.isclose(
+        Bfield_1, Bfield_2
+    ), "Bfields should differ for different dates"

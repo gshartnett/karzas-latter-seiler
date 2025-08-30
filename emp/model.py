@@ -6,20 +6,24 @@ Contains the EmpModel class for simulating EMP effects, as well as the
 EmpLosResult dataclass for storing results.
 """
 
+import datetime
 import json
 from dataclasses import dataclass
+from datetime import datetime  # type: ignore
 from pathlib import Path
 from typing import (
     Any,
     Callable,
     Dict,
     List,
+    Optional,
     Tuple,
     Union,
     cast,
 )
 
 import numpy as np
+import pandas as pd
 import yaml  # type: ignore
 from numpy.typing import NDArray
 from scipy.integrate import (
@@ -52,6 +56,7 @@ from emp.constants import (
     DEFAULT_total_yield_kt,
 )
 from emp.geomagnetic_field import (
+    DipoleMagneticField,
     MagneticFieldFactory,
     MagneticFieldModel,
 )
@@ -160,6 +165,7 @@ class EmpModel:
         rtol: float = DEFAULT_rtol,
         numerical_integration_method: str = "Radau",
         magnetic_field_model: Union[str, MagneticFieldModel] = "dipole",
+        magnetic_field_date: Optional[Union[str, datetime.date]] = None,
         time_max: float = 100.0,
         num_time_points: int = 300,
     ) -> None:
@@ -197,6 +203,8 @@ class EmpModel:
         magnetic_field_model : Union[str, MagneticFieldModel], optional
             Magnetic field model to use ('dipole' or 'igrf').
             By default 'dipole'.
+        magnetic_field_date : datetime, optional
+            Date for the magnetic field model, if applicable.
         time_max : float, optional
             Max time to integrate to in ns.
             By default 100.0 ns.
@@ -242,12 +250,8 @@ class EmpModel:
         # Calculate geometric angle A
         self.A = geometry.get_A_angle(burst_point, self.midway_point)
 
-        # Initialize magnetic field model and calculate theta, Bnorm
-        self.magnetic_field = MagneticFieldFactory.create(magnetic_field_model)
-        self.theta = self.magnetic_field.get_theta_angle(
-            point_burst=burst_point, point_los=self.midway_point
-        )
-        self.Bnorm = self.magnetic_field.get_field_magnitude(self.midway_point)
+        # Set-up geomagnetic field
+        self._set_up_geomagnetic_field(magnetic_field_date, magnetic_field_model)
 
         # Secondary/derivative parameters
         # max A angle (line of sight is tangent to horizon)
@@ -299,6 +303,55 @@ class EmpModel:
                 f"Angle A ({self.A:.4f}) must be between 0 and Amax ({self.Amax:.4f}) "
                 f"for height of burst {self.HOB} km"
             )
+
+    def _set_up_geomagnetic_field(
+        self,
+        magnetic_field_date: Optional[Union[str, datetime.date]],
+        magnetic_field_model: Union[str, MagneticFieldModel],
+    ) -> None:
+        """
+        Set up the geomagnetic field based on the provided model and date.
+
+        Parameters
+        ----------
+        magnetic_field_date : str or datetime.date, optional
+            Date for the magnetic field model. Ignored for 'dipole'.
+        magnetic_field_model : Union[str, MagneticFieldModel]
+            Magnetic field model to use, either a string identifier or an instance of MagneticFieldModel.
+
+        Raises
+        ------
+        ValueError
+            If magnetic_field_date is provided for the 'dipole' model.
+        """
+
+        # Handle dipole restriction
+        if magnetic_field_date is not None and (
+            magnetic_field_model == "dipole"
+            or isinstance(magnetic_field_model, DipoleMagneticField)
+        ):
+            raise ValueError(
+                "magnetic_field_date should not be provided for 'dipole' model."
+            )
+
+        # Normalize date
+        if magnetic_field_date is not None:
+            magnetic_field_date = pd.Timestamp(magnetic_field_date)
+
+        # Store and build field
+        self.magnetic_field_date = magnetic_field_date
+        kwargs = (
+            {"date": magnetic_field_date} if magnetic_field_date is not None else {}
+        )
+        self.magnetic_field = MagneticFieldFactory.create(
+            magnetic_field_model, **kwargs
+        )
+
+        # Compute derived quantities
+        self.theta = self.magnetic_field.get_theta_angle(
+            point_burst=self.burst_point, point_los=self.midway_point
+        )
+        self.Bnorm = self.magnetic_field.get_field_magnitude(self.midway_point)
 
     def RCompton(self, r: float) -> float:
         """
@@ -1032,6 +1085,15 @@ class EmpModel:
         """
         filepath = Path(filepath)
 
+        if isinstance(self.magnetic_field_date, str):
+            date_str = self.magnetic_field_date
+        else:
+            date_str = (
+                self.magnetic_field_date.isoformat()
+                if self.magnetic_field_date
+                else None
+            )
+
         config = {
             "model_parameters": {
                 "total_yield_kt": float(self.total_yield_kt),
@@ -1044,6 +1106,7 @@ class EmpModel:
                 "magnetic_field_model": str(type(self.magnetic_field).__name__)
                 .replace("MagneticField", "")
                 .lower(),
+                "magnetic_field_date": date_str,
                 "time_max": float(self.time_max),
                 "num_time_points": int(self.num_time_points),
             },
@@ -1122,6 +1185,12 @@ class EmpModel:
             altitude_km=target_config.get("altitude_km", 0.0),
         )
 
+        magnetic_field_date = (
+            datetime.fromisoformat(model_params.get("magnetic_field_date"))
+            if model_params.get("magnetic_field_date")
+            else None
+        )
+
         # Create model instance
         model = cls(
             burst_point=burst_point,
@@ -1134,6 +1203,7 @@ class EmpModel:
             rtol=model_params["rtol"],
             numerical_integration_method=model_params["numerical_integration_method"],
             magnetic_field_model=model_params["magnetic_field_model"],
+            magnetic_field_date=magnetic_field_date,
             time_max=model_params["time_max"],
             num_time_points=model_params["num_time_points"],
         )

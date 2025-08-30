@@ -197,7 +197,7 @@ class IGRFMagneticField(MagneticField):
             Date for IGRF model evaluation. If None, uses January 1, 2020.
         """
         if date is None:
-            self.date = datetime(2020, 1, 1)  # Fixed date within IGRF range
+            self.date = datetime.today()  # Fixed date within IGRF range
         else:
             self.date = date
 
