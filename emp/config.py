@@ -12,6 +12,7 @@ Minimal usage example:
     # Generate configs for a parameter sweep
     generate_configs(
         base_config_path="configs/base.yaml",
+        output_dir="configs",
         scan_name="yield_study",
         parameters={
             "model_parameters.total_yield_kt": [1, 5, 10, 20],
@@ -53,12 +54,45 @@ from emp.model import EmpModel
 logger = logging.getLogger(__name__)
 
 
+def _flatten_parameters(
+    params: Dict[str, Any], parent_key: str = "", sep: str = "."
+) -> Dict[str, List[Any]]:
+    """
+    Flatten a nested dictionary into dot-notation keys.
+
+    Example
+    -------
+    {
+        "target_point": {
+            "latitude": [1, 2],
+            "longitude": [3, 4],
+            "altitude_km": 0.0,
+        }
+    }
+    ->
+    {
+        "target_point.latitude": [1, 2],
+        "target_point.longitude": [3, 4],
+        "target_point.altitude_km": [0.0],
+    }
+    """
+    items: Dict[str, List[Any]] = {}
+    for k, v in params.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.update(_flatten_parameters(v, new_key, sep=sep))
+        else:
+            # always wrap scalars into a list for consistency
+            items[new_key] = v if isinstance(v, list) else [v]
+    return items
+
+
 def generate_configs(
     base_config_path: Union[str, Path],
+    output_dir: Union[str, Path],
     scan_name: str,
-    parameters: Dict[str, List[Any]],
-    output_dir: Optional[Union[str, Path]] = None,
-) -> Path:
+    parameters: Dict[str, Any],
+) -> None:
     """
     Generate multiple configuration files from a base config by varying specified parameters.
 
@@ -66,70 +100,51 @@ def generate_configs(
     ----------
     base_config_path : Union[str, Path]
         Path to the base YAML configuration file
+    output_dir : str
+        Directory where generated config files will be saved.
     scan_name : str
         Name for this scan (used in directory and file names)
-    parameters : Dict[str, List[Any]]
-        Dictionary mapping parameter names (dot notation) to lists of values
-        Example: {"model_parameters.total_yield_kt": [1, 5, 10],
-                 "geometry.burst_point.altitude_km": [100, 150, 200]}
-    output_dir : Optional[Union[str, Path]]
-        Output directory. If None, uses runs/<scan_name>
-
-    Returns
-    -------
-    Path
-        Path to the output directory containing generated configs
+    parameters : Dict[str, Any]
+        Dictionary mapping parameters (can be nested) to lists or scalars
     """
     base_config_path = Path(base_config_path)
     if not base_config_path.exists():
         raise FileNotFoundError(f"Base config file not found: {base_config_path}")
 
-    # Load base configuration
-    with open(base_config_path, "r") as f:
-        base_config = yaml.safe_load(f)
+    # Ensure output directory exists
+    output_dir_with_scan_name = Path(output_dir) / scan_name
+    output_dir_with_scan_name.mkdir(parents=True, exist_ok=True)
 
-    # Set output directory
-    if output_dir is None:
-        output_dir = Path("runs") / scan_name
-    else:
-        output_dir = Path(output_dir)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Flatten parameters (nested dict -> dot notation)
+    flat_parameters = _flatten_parameters(parameters)
 
     # Generate all parameter combinations
-    param_names = list(parameters.keys())
-    param_values = list(parameters.values())
+    param_names = list(flat_parameters.keys())
+    param_values = list(flat_parameters.values())
     combinations = list(itertools.product(*param_values))
-
-    # Create scan metadata
-    scan_info = {
-        "base_config": str(base_config_path),
-        "scan_name": scan_name,
-        "parameters": parameters,
-        "num_configs": len(combinations),
-        "created": time.strftime("%Y-%m-%d %H:%M:%S"),
-    }
-
-    with open(output_dir / "scan_info.json", "w") as f:
-        json.dump(scan_info, f, indent=2)
 
     # Generate configuration files
     for i, combination in enumerate(combinations):
-        # Copy base config
-        config = base_config.copy()
+        config = yaml.safe_load(base_config_path.read_text())  # fresh copy each time
 
-        # Create filename
-        filename = f"{scan_name}_config_{i:04d}.yaml"
-        config_path = output_dir / filename
+        # Apply parameter values
+        for param_name, value in zip(param_names, combination):
+            keys = param_name.split(".")
+            current = config
+            for key in keys[:-1]:
+                if key not in current or not isinstance(current[key], dict):
+                    current[key] = {}
+                current = current[key]
+            current[keys[-1]] = value
 
-        # Save configuration
-        with open(config_path, "w") as f:
+        # Save configuration with sequential filename
+        output_filename = f"config_{i:04d}.yaml"
+        with open(output_dir_with_scan_name / output_filename, "w") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False, indent=2)
 
-    logger.info(f"Generated {len(combinations)} configurations in {output_dir}")
-    logger.info(f"Scan info saved to {output_dir / 'scan_info.json'}")
-
-    return output_dir
+    logger.info(
+        f"Generated {len(combinations)} configurations in {output_dir_with_scan_name}"
+    )
 
 
 def _run_single_config_parallel(args: Tuple[Path, Path]) -> Dict[str, Any]:
@@ -195,6 +210,7 @@ def _run_single_config_parallel(args: Tuple[Path, Path]) -> Dict[str, Any]:
 
 def run_configs(
     config_dir: Union[str, Path],
+    results_dir: Union[str, Path],
     num_cores: Optional[int] = None,
     timeout: Optional[float] = None,
 ) -> Dict[str, Any]:
@@ -205,6 +221,8 @@ def run_configs(
     ----------
     config_dir : Union[str, Path]
         Directory containing YAML configuration files
+    results_dir : Union[str, Path]
+        Directory to save results.
     num_cores : Optional[int]
         Number of parallel processes. If None, uses half of available CPU cores
     timeout : Optional[float]
@@ -241,15 +259,8 @@ def run_configs(
         logger.info(f"Timeout per simulation: {timeout}s")
 
     # Create results directory
-    results_dir = config_dir / "results"
-    results_dir.mkdir(exist_ok=True)
-
-    # Load scan info if available
-    scan_info_file = config_dir / "scan_info.json"
-    scan_info = {}
-    if scan_info_file.exists():
-        with open(scan_info_file, "r") as f:
-            scan_info = json.load(f)
+    results_dir = Path(results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     # Run configurations in parallel
     start_time = time.time()
@@ -308,7 +319,6 @@ def run_configs(
 
     summary = {
         "config_directory": str(config_dir),
-        "scan_info": scan_info,
         "execution_time": total_time,
         "num_cores": num_cores,
         "timeout": timeout,

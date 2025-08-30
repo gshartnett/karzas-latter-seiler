@@ -28,7 +28,10 @@ from PIL import Image
 from tqdm import tqdm
 
 import emp.geometry as geometry
-from emp.config import generate_configs
+from emp.config import (
+    generate_configs,
+    run_configs,
+)
 from emp.constants import (
     DEFAULT_HOB,
     EARTH_RADIUS,
@@ -309,19 +312,36 @@ def _save_map_as_image(geomap: folium.Map, save_path: str) -> None:
     cropped.convert("RGB").save(save_path, dpi=(300, 300))
 
 
-def region_scan_new(
+def region_scan(
     base_config_path: str,
     scan_name: str,
     num_points_phi: int = 20,
     num_points_lambda: int = 20,
+    num_cores: int = 1,
 ) -> None:
+    """
+    Generate and run a regional EMP scan based on a base configuration file.
+
+    Parameters
+    ----------
+    base_config_path : str
+        Path to the base configuration file.
+    scan_name : str
+        Name for the scan, used to create output directory and config files.
+    num_points_phi : int, optional
+        Number of latitude grid points, by default 20.
+    num_points_lambda : int, optional
+        Number of longitude grid points, by default 20.
+    num_cores : int, optional
+        Number of CPU cores to use for running the configurations, by default 1.
+    """
+
     # Load base config
     with open(base_config_path, "r") as f:
         base_config = yaml.safe_load(f)
 
     # Extract burst point from base config
     burst_cfg = base_config["geometry"]["burst_point"]
-
     burst_point = Point.from_gps_coordinates(
         latitude=burst_cfg["latitude_deg"],
         longitude=burst_cfg["longitude_deg"],
@@ -330,8 +350,6 @@ def region_scan_new(
 
     # Identify grid of angular values
     delta_angle = 2.0 * geometry.compute_max_delta_angle_2d(burst_point)
-    print(f"Delta angle: {delta_angle:.6f} radians")
-
     lat_1d_grid = burst_point.phi_g + np.linspace(
         -delta_angle / 2, delta_angle / 2, num_points_phi
     )
@@ -343,27 +361,33 @@ def region_scan_new(
     lat_1d_grid = ((180 / np.pi) * lat_1d_grid).tolist()
     long_1d_grid = ((180 / np.pi) * long_1d_grid).tolist()
 
-    # Cartesian product → 2 1D arrays
-    # lat_grid, long_grid = np.meshgrid(lat_1d_grid, long_1d_grid, indexing="ij")
-    # lat_values = lat_grid.ravel().to_list()
-    # long_values = long_grid.ravel().to_list()
-
     # Create all config files
     generate_configs(
         base_config_path=base_config_path,
+        output_dir="configs",
         scan_name=scan_name,
         parameters={
-            "latitude": lat_1d_grid,
-            "longitude": long_1d_grid,
+            "geometry": {
+                "target_point": {
+                    "latitude_deg": lat_1d_grid,
+                    "longitude_deg": long_1d_grid,
+                    "altitude_km": 0.0,
+                }
+            }
         },
-        output_dir=f"configs/{scan_name}",
     )
 
     # Run all config files
+    run_configs(
+        config_dir=f"configs/{scan_name}",
+        results_dir=f"results/{scan_name}",
+        num_cores=num_cores,
+    )
 
     return
 
 
+'''
 def region_scan(
     burst_point: Point,
     HOB: float = DEFAULT_HOB,
@@ -505,3 +529,4 @@ def region_scan(
                 results["max_E_phi_at_ground"][i, j] = 0.0
 
     return results
+'''

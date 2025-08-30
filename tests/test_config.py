@@ -22,56 +22,46 @@ from emp.config import (
 
 
 def test_generate_configs() -> None:
-    """Test that generate_configs creates the expected configuration files."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
+    """Test that generate_configs creates the expected number of config files."""
+    scan_name = "unit_test_tmp_dir"
 
-        # Create a simple base config
-        base_config = {
-            "model_parameters": {"total_yield_kt": 5.0},
-            "geometry": {"burst_point": {"altitude_km": 100}},
-        }
-        base_config_path = temp_path / "base.yaml"
-        with open(base_config_path, "w") as f:
-            yaml.dump(base_config, f)
+    # Use a temporary directory for this test
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
 
-        # Generate configs with parameter variations
-        parameters = {
-            "model_parameters.total_yield_kt": [1, 5, 10],
-            "geometry.burst_point.altitude_km": [100, 200],
-        }
+        # Generate configs
+        base_config_path = "configs/example/basic_line_of_sight.yaml"
 
-        output_dir = generate_configs(
+        generate_configs(
             base_config_path=base_config_path,
-            scan_name="test_scan",
-            parameters=parameters,
-            output_dir=temp_path / "test_output",
+            scan_name=scan_name,
+            output_dir=tmp_path,  # <-- temporary directory
+            parameters={
+                "geometry": {
+                    "target_point": {
+                        "latitude_deg": [40.0, 41.0, 42.0, 43.0, 44.0],
+                        "longitude_deg": [-100.0, -101.0, -102.0, -103.0, -104.0],
+                        "altitude_km": 0.0,
+                    }
+                }
+            },
         )
 
-        # Verify output directory was created
-        assert output_dir.exists()
+        # Verify configs were written under tmp_dir / scan_name
+        config_dir = tmp_path / scan_name
+        assert config_dir.exists() and config_dir.is_dir()
 
-        # Verify scan_info.json was created
-        scan_info_file = output_dir / "scan_info.json"
-        assert scan_info_file.exists()
+        config_files = list(config_dir.glob("config_*.yaml"))
+        assert len(config_files) == 25  # 5 lat × 5 lon = 25 configs
 
-        with open(scan_info_file) as f:
-            scan_info = json.load(f)
-        assert scan_info["scan_name"] == "test_scan"
-        assert scan_info["num_configs"] == 6  # 3 * 2 = 6 combinations
+        # Verify contents of one config file
+        with open(config_files[0], "r") as f:
+            config = yaml.safe_load(f)
 
-        # Verify config files were created
-        config_files = list(output_dir.glob("*.yaml"))
-        assert len(config_files) == 6
-
-        # Verify one config file has correct parameter values
-        sample_config_path = config_files[0]
-        with open(sample_config_path) as f:
-            sample_config = yaml.safe_load(f)
-
-        # Should have the varied parameters
-        assert "total_yield_kt" in sample_config["model_parameters"]
-        assert "altitude_km" in sample_config["geometry"]["burst_point"]
+        assert "model_parameters" in config
+        assert "geometry" in config
+        assert "burst_point" in config["geometry"]
+        assert "target_point" in config["geometry"]
 
 
 def test_run_configs() -> None:
@@ -126,7 +116,7 @@ def test_run_configs() -> None:
             mock_emp_model.from_yaml.return_value = mock_model
 
             # Run the configs
-            summary = run_configs(temp_path, num_cores=1)
+            summary = run_configs(temp_path, temp_path, num_cores=1)
 
         # Verify summary structure
         assert isinstance(summary, dict)
@@ -135,14 +125,6 @@ def test_run_configs() -> None:
         assert summary["failed_configs"] == 0
         assert "results" in summary
         assert len(summary["results"]) == 2
-
-        # Verify results directory was created
-        results_dir = temp_path / "results"
-        assert results_dir.exists()
-
-        # Verify execution summary was saved
-        execution_summary_path = results_dir / "execution_summary.json"
-        assert execution_summary_path.exists()
 
         # Verify field statistics were calculated
         assert "field_statistics" in summary
