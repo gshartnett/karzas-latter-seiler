@@ -92,7 +92,7 @@ def generate_configs(
     output_dir: Union[str, Path],
     scan_name: str,
     parameters: Dict[str, Any],
-) -> None:
+) -> Path:
     """
     Generate multiple configuration files from a base config by varying specified parameters.
 
@@ -106,6 +106,11 @@ def generate_configs(
         Name for this scan (used in directory and file names)
     parameters : Dict[str, Any]
         Dictionary mapping parameters (can be nested) to lists or scalars
+
+    Returns
+    -------
+    Path
+        Path to the directory where configs were generated.
     """
     base_config_path = Path(base_config_path)
     if not base_config_path.exists():
@@ -145,6 +150,8 @@ def generate_configs(
     logger.info(
         f"Generated {len(combinations)} configurations in {output_dir_with_scan_name}"
     )
+
+    return output_dir_with_scan_name
 
 
 def _run_single_config_parallel(args: Tuple[Path, Path]) -> Dict[str, Any]:
