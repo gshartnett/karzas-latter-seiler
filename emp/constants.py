@@ -41,3 +41,5 @@ DEFAULT_A = (
 DEFAULT_pulse_param_a = 1e7 * 1e-9  # pulse parameter in 1/ns
 DEFAULT_pulse_param_b = 3.7 * 1e8 * 1e-9  # pulse parameter in 1/ns
 DEFAULT_rtol = 1e-4  # relative tolerance for ODE integration
+DEFAULT_TIME_MAX = 100.0  # max time to integrate to in ns
+DEFAULT_NUM_TIME_POINTS = 300  # number of time points to compute

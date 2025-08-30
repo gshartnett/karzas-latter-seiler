@@ -1,9 +1,14 @@
 """
 Copyright (C) 2023 by The RAND Corporation
-See LICENSE and README.md for information on usage and licensing
+See LICENSE and README.md for information on usage and licensing.
+
+Contains the Point class describe locations in a coordinate-independent manner.
 """
 
-from typing import Tuple
+from typing import (
+    Tuple,
+    Union,
+)
 
 import numpy as np
 from numpy.typing import NDArray
@@ -17,7 +22,7 @@ from emp.constants import (
 )
 
 
-def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.floating]:
+def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.float64]:
     """
     Rotation matrix for angle theta and axis (vx, vy, vz).
     https://en.wikipedia.org/wiki/Rotation_matrix#Conversion_from_rotation_matrix_to_axis%E2%80%93angle
@@ -29,7 +34,7 @@ def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.floating]:
 
     Returns
     -------
-    NDArray[np.floating]
+    NDArray[np.float64]
         Rotation matrix.
     """
     if len(axis) != 3:
@@ -39,7 +44,7 @@ def get_rotation_matrix(theta: float, axis: np.ndarray) -> NDArray[np.floating]:
     vec_x, vec_y, vec_z = axis / np.linalg.norm(axis)
 
     # Build the rotation matrix
-    rotation_matrix: NDArray[np.floating] = np.zeros((3, 3))
+    rotation_matrix: NDArray[np.float64] = np.zeros((3, 3))
 
     rotation_matrix[0, 0] = np.cos(theta) + vec_x**2 * (1 - np.cos(theta))
     rotation_matrix[0, 1] = vec_x * vec_y * (1 - np.cos(theta)) - vec_z * np.sin(theta)
@@ -215,6 +220,55 @@ class Point:
         return hash(
             (round(self.r_g, 10), round(self.phi_g, 10), round(self.lambd_g, 10))
         )
+
+    @classmethod
+    def from_gps_coordinates(
+        cls,
+        latitude: Union[float, str],
+        longitude: Union[float, str],
+        altitude_km: float = 0.0,
+    ) -> "Point":
+        """
+        Create a Point from GPS-style coordinates.
+
+        Parameters
+        ----------
+        latitude : float | str
+            Latitude in degrees (e.g. 40.7128) or as a string with N/S suffix.
+        longitude : float | str
+            Longitude in degrees (e.g. -74.0060) or as a string with E/W suffix.
+        altitude_km : float
+            Altitude above mean sea level in kilometers.
+
+        Returns
+        -------
+        Point
+            A Point object in geographic lat/long coordinates.
+        """
+
+        # If inputs are strings like "40.7N", "74W", handle parsing:
+        def parse_coord(coord: Union[float, str], is_lat: bool) -> float:
+            if isinstance(coord, (int, float)):
+                return float(coord)
+            c = coord.strip().upper()
+            if c.endswith("N") and is_lat:
+                return float(c[:-1])
+            if c.endswith("S") and is_lat:
+                return -float(c[:-1])
+            if c.endswith("E") and not is_lat:
+                return float(c[:-1])
+            if c.endswith("W") and not is_lat:
+                return -float(c[:-1])
+            return float(c)
+
+        lat_deg = parse_coord(latitude, True)
+        lon_deg = parse_coord(longitude, False)
+
+        r = EARTH_RADIUS + altitude_km
+        phi = np.radians(lat_deg)  # latitude in radians
+        lambd = np.radians(lon_deg)  # longitude in radians
+
+        return cls(r, phi, lambd, coordsys="lat/long geo")
 
     @staticmethod
     def validate_latlong_coords(r: float, phi: float, lambd: float) -> None:
@@ -415,7 +469,7 @@ def _cartesian_to_spherical(x: float, y: float, z: float) -> Tuple[float, float,
     return r, theta, phi
 
 
-def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point) -> NDArray[np.floating]:
+def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point) -> NDArray[np.float64]:
     """
     Compute the vector pointing from A to B in geographic cartesian
     coordinates.
@@ -429,13 +483,13 @@ def get_xvec_g_from_A_to_B(pointA: Point, pointB: Point) -> NDArray[np.floating]
 
     Returns
     -------
-    NDArray[np.floating]
+    NDArray[np.float64]
         The vector pointing from point A to point B.
     """
-    xvec_g_from_O_to_A: NDArray[np.floating] = np.asarray(
+    xvec_g_from_O_to_A: NDArray[np.float64] = np.asarray(
         [pointA.x_g, pointA.y_g, pointA.z_g]
     )
-    xvec_g_from_O_to_B: NDArray[np.floating] = np.asarray(
+    xvec_g_from_O_to_B: NDArray[np.float64] = np.asarray(
         [pointB.x_g, pointB.y_g, pointB.z_g]
     )
     return xvec_g_from_O_to_B - xvec_g_from_O_to_A
@@ -519,6 +573,13 @@ def get_line_of_sight_midway_point(point_b: Point, point_t: Point) -> Point:
         np.linalg.norm(np.asarray([point_b.x_g, point_b.y_g, point_b.z_g]))
         - EARTH_RADIUS
     )
+
+    # TODO Remove this restriction
+    if HOB < ABSORPTION_LAYER_UPPER:
+        raise ValueError(
+            "Burst height must be above the upper absorption layer "
+            f"({ABSORPTION_LAYER_UPPER} km)"
+        )
 
     # distance from burst point (r=0) to top of absorption layer
     rmin = (HOB - ABSORPTION_LAYER_UPPER) / np.cos(A)
@@ -755,29 +816,30 @@ def compute_max_delta_angle_2d(
         raise ValueError("Tolerance must be positive")
 
     def _test_delta_angle_2d(delta_angle: float) -> bool:
-        """Test if all points in 2D lat/long grid have line-of-sight."""
         offsets = np.linspace(-delta_angle / 2, delta_angle / 2, n_grid_points)
         phi_targets = burst_point.phi_g + offsets
-        lambd_targets = burst_point.lambd_g + offsets
+        lambd_targets = ((burst_point.lambd_g + offsets + np.pi) % (2 * np.pi)) - np.pi
 
-        for phi_target in phi_targets:
-            # Check latitude bounds
+        def check(phi_target: float, lambd_target: float) -> bool:
             if not (-np.pi / 2 <= phi_target <= np.pi / 2):
                 return False
+            try:
+                target_point = Point(
+                    EARTH_RADIUS, phi_target, lambd_target, coordsys="lat/long geo"
+                )
+                line_of_sight_check(burst_point, target_point)
+                return True
+            except ValueError:
+                return False
 
-            for lambd_target in lambd_targets:
-                try:
-                    # Normalize longitude to [-π, π)
-                    lambd_normalized = ((lambd_target + np.pi) % (2 * np.pi)) - np.pi
-
-                    target_point = Point(
-                        EARTH_RADIUS,
-                        phi_target,
-                        lambd_normalized,
-                        coordsys="lat/long geo",
-                    )
-                    line_of_sight_check(burst_point, target_point)
-                except ValueError:
+        # Only check perimeter
+        for phi in (phi_targets[0], phi_targets[-1]):
+            for lambd in lambd_targets:
+                if not check(phi, lambd):
+                    return False
+        for phi in phi_targets[1:-1]:
+            for lambd in (lambd_targets[0], lambd_targets[-1]):
+                if not check(phi, lambd):
                     return False
         return True
 

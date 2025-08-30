@@ -8,41 +8,14 @@ Quick Start
 -----------
 
 Simulate the effects of a high-altitude EMP.
+In this case, the detonation occurs over New York City (40.7128° N, 74.0060° W)
+and the target is Washington, D.C. (38.9072° N, 77.0369° W).
 
-.. code-block:: python
+.. code-block:: bash
 
-   import numpy as np
-
-   from emp.constants import (
-       DEFAULT_A,
-       DEFAULT_HOB,
-       DEFAULT_Bnorm,
-       DEFAULT_Compton_KE,
-       DEFAULT_gamma_yield_fraction,
-       DEFAULT_pulse_param_a,
-       DEFAULT_pulse_param_b,
-       DEFAULT_rtol,
-       DEFAULT_theta,
-       DEFAULT_total_yield_kt,
-   )
-   from emp.model import EmpModel
-
-   # Define model parameters (can be customized)
-   model = EmpModel(
-       HOB=DEFAULT_HOB,
-       Compton_KE=DEFAULT_Compton_KE,
-       total_yield_kt=DEFAULT_total_yield_kt,
-       gamma_yield_fraction=DEFAULT_gamma_yield_fraction,
-       Bnorm=DEFAULT_Bnorm,
-       A=DEFAULT_A,
-       theta=DEFAULT_theta,
-       pulse_param_a=DEFAULT_pulse_param_a,
-       pulse_param_b=DEFAULT_pulse_param_b,
-       rtol=DEFAULT_rtol,
-   )
-
-   # Perform the line-of-sight integration for a range of time values
-   sol = model.solver(tlist=np.linspace(0, 50, 200))
+    python scripts/run_line_of_sight.py \
+        --lat_burst=40.7128 --lon_burst=-74.0060 \
+        --lat_target=38.9072 --lon_target=-77.0369
 
 Contents
 --------

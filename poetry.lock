@@ -2187,6 +2187,17 @@ trio = ">=0.11"
 wsproto = ">=0.14"
 
 [[package]]
+name = "types-pyyaml"
+version = "6.0.12.20250822"
+description = "Typing stubs for PyYAML"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "types_pyyaml-6.0.12.20250822-py3-none-any.whl", hash = "sha256:1fe1a5e146aa315483592d292b72a172b65b946a6d98aa6ddd8e4aa838ab7098"},
+    {file = "types_pyyaml-6.0.12.20250822.tar.gz", hash = "sha256:259f1d93079d335730a9db7cff2bcaf65d7e04b4a56b5927d49a612199b59413"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.14.1"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -2520,4 +2531,4 @@ viz = ["cartopy (>=0.23)", "matplotlib", "nc-time-axis", "seaborn"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.13"
-content-hash = "42ce9fc466fd970448b2a90a12e8d02647d5229a8fd43f97d61916f32fce641a"
+content-hash = "1870a7a9211c601612b2c1751918cf1434dbf08e162619d1bc3cb578cbb9998e"
