@@ -4,6 +4,7 @@ See LICENSE and README.md for information on usage and licensing
 """
 
 import io
+from pathlib import Path
 from typing import (
     Any,
     Dict,
@@ -44,7 +45,10 @@ from emp.constants import (
 )
 from emp.geomagnetic_field import MagneticFieldFactory
 from emp.geometry import Point
-from emp.model import EmpModel
+from emp.model import (
+    EmpLosResult,
+    EmpModel,
+)
 
 # Configure matplotlib
 plt.rcParams.update(
@@ -75,6 +79,60 @@ plt.rcParams.update(
 )
 
 
+def load_scan_results(
+    results_dir: Union[str, Path]
+) -> Tuple[List[float], List[float], List[float], Point]:
+    """
+    Load all EmpLosResult JSON files in a directory and return lat, lon, max E lists,
+    as well as burst point (verifying all results share the same burst point).
+
+    Parameters
+    ----------
+    results_dir : Union[str, Path]
+        Directory containing result JSON files.
+
+    Returns
+    -------
+    Tuple[List[float], List[float], List[float], Point]
+        latitudes, longitudes, max E-field magnitudes, and burst point.
+    """
+    # Extract the results files
+    results_dir = Path(results_dir)
+    json_files = sorted(results_dir.glob("config_*_result.json"))
+    if not json_files:
+        raise ValueError(f"No result JSON files found in {results_dir}")
+
+    lat_list, lon_list, E_max_list, burst_points = [], [], [], []
+
+    for file in json_files:
+        result = EmpLosResult.load(file)
+        target = result.target_point_dict
+
+        lat_list.append(target["latitude_rad"] * 180 / np.pi)
+        lon_list.append(target["longitude_rad"] * 180 / np.pi)
+        E_max_list.append(max(result.E_norm_at_ground))
+
+        # Nested burst point structure
+        burst_dict = result.burst_point_dict
+
+        burst_points.append(
+            Point.from_gps_coordinates(
+                latitude=burst_dict["latitude_rad"] * 180 / np.pi,
+                longitude=burst_dict["longitude_rad"] * 180 / np.pi,
+                altitude_km=result.model_params["HOB"],
+            )
+        )
+
+    # Verify all burst points are the same
+    first_burst = burst_points[0]
+    for bp in burst_points[1:]:
+        if bp != first_burst:
+            raise ValueError("Not all results share the same burst point!")
+
+    return lat_list, lon_list, E_max_list, first_burst
+
+
+'''
 def data_dic_to_xyz(
     data_dic: Dict[str, Any], gaussian_smooth: bool = True, field_type: str = "norm"
 ) -> Tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]]:
@@ -127,8 +185,159 @@ def data_dic_to_xyz(
         np.asarray(y_coords.flatten(), dtype=np.floating),
         np.asarray(field_strength.flatten(), dtype=np.floating),
     )
+'''
 
 
+def contour_plot(
+    results_dir: Union[str, Path],
+    save_path: Optional[str] = None,
+    show_grid: bool = False,
+    show: bool = True,
+) -> Tuple[matplotlib.contour.QuadContourSet, List[float]]:
+    """
+    Create a contour plot directly from a directory of EMP result JSON files.
+
+    Parameters
+    ----------
+    results_dir : Union[str, Path]
+        Directory containing result JSON files (EmpLosResult).
+    burst_point : Point
+        Burst location for line-of-sight calculations.
+    save_path : Optional[str], optional
+        Path to save the figure, by default None.
+    show_grid : bool, optional
+        Whether to show the grid, by default False.
+    show : bool, optional
+        Whether to display the plot, by default True.
+
+    Returns
+    -------
+    Tuple[matplotlib.contour.QuadContourSet, List[float]]
+        Contour plot object and contour levels.
+    """
+    results_dir = Path(results_dir)
+    lat_list, lon_list, E_max_list, burst_point = load_scan_results(results_dir)
+
+    fig, ax = plt.subplots(dpi=150, figsize=(14, 10))
+
+    # Create interpolation grid
+    grid_size = 300
+    xi = np.linspace(np.min(lon_list), np.max(lon_list), grid_size)
+    yi = np.linspace(np.min(lat_list), np.max(lat_list), grid_size)
+    triang = tri.Triangulation(lon_list, lat_list)
+    interpolator = tri.LinearTriInterpolator(triang, E_max_list)
+    Xi, Yi = np.meshgrid(xi, yi)
+    zi = interpolator(Xi, Yi)
+
+    # Mask points outside line of sight
+    for i, longitude in enumerate(xi):
+        for j, latitude in enumerate(yi):
+            phi = latitude * np.pi / 180
+            lambd = longitude * np.pi / 180
+            target_point = Point(EARTH_RADIUS, phi, lambd, "lat/long geo")
+            try:
+                geometry.line_of_sight_check(burst_point, target_point)
+            except Exception:
+                zi[j, i] = np.nan
+
+    # Define contour levels
+    level_spacing = 5e3
+    z_min: float = np.nanmin(E_max_list)
+    z_max: float = np.nanmax(E_max_list)
+    level_min = int(np.floor(z_min / level_spacing)) - 1
+    level_max = int(np.ceil(z_max / level_spacing)) + 1
+    levels = [i * level_spacing for i in range(level_min, level_max + 1)]
+
+    contourf = ax.contourf(Xi, Yi, zi, levels=levels, cmap="RdBu_r", extend="max")
+    contour_lines = ax.contour(Xi, Yi, zi, levels=levels, linewidths=1, colors="k")
+    ax.clabel(contour_lines, inline=True, fontsize=10, fmt="%.0f")
+
+    fig.colorbar(contourf, ax=ax, label=r"$E$ [V/m]")
+    ax.set_xlabel("Longitude [degrees]")
+    ax.set_ylabel("Latitude [degrees]")
+    ax.grid(show_grid)
+
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+    return contourf, levels
+
+
+def folium_plot(
+    results_dir: Union[str, Path],
+    burst_point: Point,
+    save_path: str,
+) -> folium.Map:
+    """
+    Create a folium map with EMP contours directly from result JSON files.
+
+    Parameters
+    ----------
+    results_dir : Union[str, Path]
+        Directory containing result JSON files (EmpLosResult).
+    burst_point : Point
+        Ground zero location.
+    save_path : str
+        Path to save the map image.
+
+    Returns
+    -------
+    folium.Map
+        Interactive folium map.
+    """
+    contourf, levels = contour_plot(
+        results_dir, burst_point, save_path=None, show=False
+    )
+
+    # Convert to GeoJSON
+    geojsonf = geojsoncontour.contourf_to_geojson(contourf=contourf)
+
+    # Colormap
+    cmap = plt.colormaps["RdBu_r"]
+    colors = [cmap(x) for x in np.linspace(0, 1, len(levels))]
+    colormap = branca.colormap.LinearColormap(
+        colors, vmin=np.min(levels), vmax=np.max(levels)
+    ).to_step(index=levels)
+
+    # Create base map
+    geomap = folium.Map(
+        location=[burst_point.latitude_deg, burst_point.longitude_deg],
+        width=750,
+        height=750,
+        zoom_start=5,
+        tiles="CartoDB positron",
+    )
+
+    folium.GeoJson(
+        geojsonf,
+        style_function=lambda feature: {
+            "color": "gray",
+            "weight": 1,
+            "fillColor": feature["properties"]["fill"],
+            "opacity": 1,
+            "fillOpacity": 0.5,
+        },
+    ).add_to(geomap)
+
+    colormap.caption = "E-field Strength [V/m]"
+    geomap.add_child(colormap)
+
+    folium.Marker(
+        location=[burst_point.latitude_deg, burst_point.longitude_deg],
+        popup="Ground Zero",
+        icon=folium.Icon(color="red", icon="flash"),
+    ).add_to(geomap)
+
+    _save_map_as_image(geomap, save_path)
+
+    return geomap
+
+
+'''
 def contour_plot(
     x: NDArray[np.floating],
     y: NDArray[np.floating],
@@ -291,6 +500,7 @@ def folium_plot(
     _save_map_as_image(geomap, save_path)
 
     return geomap
+'''
 
 
 def _save_map_as_image(geomap: folium.Map, save_path: str) -> None:
@@ -385,148 +595,3 @@ def region_scan(
     )
 
     return
-
-
-'''
-def region_scan(
-    burst_point: Point,
-    HOB: float = DEFAULT_HOB,
-    Compton_KE: float = DEFAULT_Compton_KE,
-    total_yield_kt: float = DEFAULT_total_yield_kt,
-    gamma_yield_fraction: float = DEFAULT_gamma_yield_fraction,
-    pulse_param_a: float = DEFAULT_pulse_param_a,
-    pulse_param_b: float = DEFAULT_pulse_param_b,
-    rtol: float = DEFAULT_rtol,
-    N_pts_phi: int = 20,
-    N_pts_lambd: int = 20,
-    time_max: float = 100.0,
-    N_pts_time: int = 50,
-    b_field_type: str = "dipole",
-) -> Dict[str, Union[NDArray[np.floating], NDArray[Any]]]:
-    """
-    Perform 2D regional scan of EMP field strength.
-
-    This function computes the maximum EMP field strength at ground level
-    over a grid of geographic coordinates around the burst point.
-
-    Parameters
-    ----------
-    burst_point : Point
-        Location of the nuclear burst.
-    HOB : float, optional
-        Height of burst in km, by default DEFAULT_HOB.
-    Compton_KE : float, optional
-        Compton electron kinetic energy in MeV, by default DEFAULT_Compton_KE.
-    total_yield_kt : float, optional
-        Total weapon yield in kilotons, by default DEFAULT_total_yield_kt.
-    gamma_yield_fraction : float, optional
-        Fraction of yield in gamma rays, by default DEFAULT_gamma_yield_fraction.
-    pulse_param_a : float, optional
-        Pulse shape parameter in 1/ns, by default DEFAULT_pulse_param_a.
-    pulse_param_b : float, optional
-        Pulse shape parameter in 1/ns, by default DEFAULT_pulse_param_b.
-    rtol : float, optional
-        Relative tolerance for ODE solver, by default DEFAULT_rtol.
-    N_pts_phi : int, optional
-        Number of latitude grid points, by default 20.
-    N_pts_lambd : int, optional
-        Number of longitude grid points, by default 20.
-    time_max : float, optional
-        Maximum simulation time in ns, by default 100.0.
-    N_pts_time : int, optional
-        Number of time points, by default 50.
-    b_field_type : str, optional
-        Magnetic field model ('dipole' or 'igrf'), by default 'dipole'.
-
-    Returns
-    -------
-    Dict[str, Union[NDArray[np.floating], NDArray[Any]]]
-        Dictionary containing scan results with field components and coordinates.
-    """
-    # Set up time and spatial grids
-    time_list = np.linspace(0, time_max, N_pts_time)
-
-    delta_angle = 2.0 * geometry.compute_max_delta_angle_2d(burst_point)
-    phi_grid = burst_point.phi_g + np.linspace(
-        -delta_angle / 2, delta_angle / 2, N_pts_phi
-    )
-    lambd_grid = burst_point.lambd_g + np.linspace(
-        -delta_angle / 2, delta_angle / 2, N_pts_lambd
-    )
-
-    # Initialize magnetic field model
-    geomagnetic_field = MagneticFieldFactory().create(b_field_type)
-
-    # Initialize results storage
-    results = {
-        "max_E_norm_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
-        "max_E_theta_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
-        "max_E_phi_at_ground": np.zeros((N_pts_phi, N_pts_lambd)),
-        "theta": np.zeros((N_pts_phi, N_pts_lambd), dtype=np.float64),
-        "A": np.zeros((N_pts_phi, N_pts_lambd), dtype=np.float64),
-        "phi_T_g": np.zeros((N_pts_phi, N_pts_lambd)),
-        "lamb_T_g": np.zeros((N_pts_phi, N_pts_lambd)),
-    }
-
-    # Perform scan
-    for i in tqdm(range(N_pts_phi), desc="Latitude"):
-        for j in tqdm(range(N_pts_lambd), desc="Longitude", leave=(i == N_pts_phi - 1)):
-            # Define target point
-            target_point = Point(
-                EARTH_RADIUS, phi_grid[i], lambd_grid[j], "lat/long geo"
-            )
-            midway_point = geometry.get_line_of_sight_midway_point(
-                burst_point, target_point
-            )
-
-            # Store coordinates
-            results["phi_T_g"][i, j] = target_point.phi_g
-            results["lamb_T_g"][i, j] = target_point.lambd_g
-
-            try:
-                # Calculate geometric and magnetic field parameters
-                A_angle = geometry.get_A_angle(burst_point, midway_point)
-                theta_angle = geomagnetic_field.get_theta_angle(
-                    point_burst=burst_point, point_los=midway_point
-                )
-                B_magnitude = geomagnetic_field.get_field_magnitude(midway_point)
-
-                # Create and solve EMP model
-                model = EmpModel(
-                    HOB=HOB,
-                    Compton_KE=Compton_KE,
-                    total_yield_kt=total_yield_kt,
-                    gamma_yield_fraction=gamma_yield_fraction,
-                    pulse_param_a=pulse_param_a,
-                    pulse_param_b=pulse_param_b,
-                    rtol=rtol,
-                    A=A_angle,
-                    theta=theta_angle,
-                    Bnorm=B_magnitude,
-                )
-
-                solution = model.solver(time_list)
-
-                # Store model parameters and results
-                results["theta"][i, j] = model.theta
-                results["A"][i, j] = model.A
-                results["max_E_norm_at_ground"][i, j] = np.max(
-                    solution["E_norm_at_ground"]
-                )
-                results["max_E_theta_at_ground"][i, j] = np.max(
-                    np.abs(solution["E_theta_at_ground"])
-                )
-                results["max_E_phi_at_ground"][i, j] = np.max(
-                    np.abs(solution["E_phi_at_ground"])
-                )
-
-            except Exception:
-                # Handle points outside line of sight or other errors
-                results["theta"][i, j] = None
-                results["A"][i, j] = None
-                results["max_E_norm_at_ground"][i, j] = 0.0
-                results["max_E_theta_at_ground"][i, j] = 0.0
-                results["max_E_phi_at_ground"][i, j] = 0.0
-
-    return results
-'''
