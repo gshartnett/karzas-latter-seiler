@@ -1,6 +1,9 @@
 """
 Copyright (C) 2023 by The RAND Corporation
-See LICENSE and README.md for information on usage and licensing
+See LICENSE and README.md for information on usage and licensing.
+
+This module contains the MagneticField class hierarchy for modeling geomagnetic fields,
+including dipole and IGRF models.
 """
 from abc import (
     ABC,

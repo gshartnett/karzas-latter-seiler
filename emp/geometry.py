@@ -1,6 +1,8 @@
 """
 Copyright (C) 2023 by The RAND Corporation
-See LICENSE and README.md for information on usage and licensing
+See LICENSE and README.md for information on usage and licensing.
+
+Contains the Point class describe locations in a coordinate-independent manner.
 """
 
 from typing import (

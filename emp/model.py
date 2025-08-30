@@ -1,6 +1,9 @@
 """
 Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
+
+Contains the EmpModel class for simulating EMP effects, as well as the
+EmpLosResult dataclass for storing results.
 """
 
 import json
