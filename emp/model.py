@@ -6,10 +6,12 @@ Contains the EmpModel class for simulating EMP effects, as well as the
 EmpLosResult dataclass for storing results.
 """
 
-import datetime
 import json
 from dataclasses import dataclass
-from datetime import datetime  # type: ignore
+from datetime import (
+    date,
+    datetime,
+)
 from pathlib import Path
 from typing import (
     Any,
@@ -165,7 +167,7 @@ class EmpModel:
         rtol: float = DEFAULT_rtol,
         numerical_integration_method: str = "Radau",
         magnetic_field_model: Union[str, MagneticFieldModel] = "dipole",
-        magnetic_field_date: Optional[Union[str, datetime.date]] = None,
+        magnetic_field_date: Optional[Union[str, date]] = None,
         time_max: float = 100.0,
         num_time_points: int = 300,
     ) -> None:
@@ -306,7 +308,7 @@ class EmpModel:
 
     def _set_up_geomagnetic_field(
         self,
-        magnetic_field_date: Optional[Union[str, datetime.date]],
+        magnetic_field_date: Optional[Union[str, date]],
         magnetic_field_model: Union[str, MagneticFieldModel],
     ) -> None:
         """
@@ -335,8 +337,15 @@ class EmpModel:
             )
 
         # Normalize date
-        if magnetic_field_date is not None:
-            magnetic_field_date = pd.Timestamp(magnetic_field_date)
+        if isinstance(magnetic_field_date, str):
+            magnetic_field_date = datetime.fromisoformat(magnetic_field_date)
+        elif isinstance(magnetic_field_date, date) and not isinstance(
+            magnetic_field_date, datetime
+        ):
+            # convert date -> datetime at midnight
+            magnetic_field_date = datetime.combine(
+                magnetic_field_date, datetime.min.time()
+            )
 
         # Store and build field
         self.magnetic_field_date = magnetic_field_date
@@ -1185,11 +1194,7 @@ class EmpModel:
             altitude_km=target_config.get("altitude_km", 0.0),
         )
 
-        magnetic_field_date = (
-            datetime.fromisoformat(model_params.get("magnetic_field_date"))
-            if model_params.get("magnetic_field_date")
-            else None
-        )
+        magnetic_field_date = model_params.get("magnetic_field_date", None)
 
         # Create model instance
         model = cls(

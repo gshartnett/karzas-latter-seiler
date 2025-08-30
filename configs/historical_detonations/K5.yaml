@@ -9,7 +9,7 @@ model_parameters:
   magnetic_field_model: igrf
   time_max: 100.0
   num_time_points: 300
-  date: 11/1/1962
+  date: 1962-1-11
 geometry:
   burst_point:
     latitude_deg: 46.3298
