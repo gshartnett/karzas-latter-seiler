@@ -1,0 +1,36 @@
+model_parameters:
+  total_yield_kt: 5.0
+  gamma_yield_fraction: 0.05
+  Compton_KE: 1.28
+  pulse_param_a: 0.01
+  pulse_param_b: 0.37
+  rtol: 0.0001
+  numerical_integration_method: "Radau"
+  magnetic_field_model: "dipole"
+  time_max: 100.0
+  num_time_points: 300
+
+geometry:
+  burst_point:
+    latitude_deg: 40.0
+    longitude_deg: -100.0
+    altitude_km: 100.0
+  target_point:
+    latitude_deg: 39.5
+    longitude_deg: -99.5
+    altitude_km: 0.0
+
+computed_parameters:
+  HOB: 100.0
+  theta: 1.5708
+  A: 0.1234
+  Bnorm: 3.12e-05
+  Amax: 0.2618
+  V0: 299792458.0
+  beta: 0.999
+  gamma: 22.366
+  omega: 1.759e11
+  q: 38787.879
+  rmin: 45.5
+  rmax: 75.2
+  rtarget: 101.5

@@ -1,0 +1,21 @@
+model_parameters:
+  total_yield_kt: 300.0
+  gamma_yield_fraction: 0.05
+  Compton_KE: 1.28
+  pulse_param_a: 0.01
+  pulse_param_b: 0.37
+  rtol: 0.0001
+  numerical_integration_method: Radau
+  magnetic_field_model: igrf
+  time_max: 100.0
+  num_time_points: 300
+  date: 10/22/1962
+geometry:
+  burst_point:
+    latitude_deg: 47.76469
+    longitude_deg: 63.95136
+    altitude_km: 290.0
+  target_point:
+    latitude_deg: 47.76469
+    longitude_deg: 63.95136
+    altitude_km: 0.0
