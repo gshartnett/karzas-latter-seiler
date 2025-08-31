@@ -23,8 +23,10 @@ import numpy as np
 import scipy.ndimage
 import yaml  # type: ignore
 from cycler import cycler
+from matplotlib import contour
 from matplotlib.contour import QuadContourSet
 from PIL import Image
+from scipy.interpolate import griddata
 
 import emp.geometry as geometry
 from emp.config import (
@@ -127,43 +129,25 @@ def contour_plot(
     show: bool = True,
     gaussian_smooth: bool = False,
     gaussian_sigma: float = 1.0,
-) -> Tuple[matplotlib.contour.QuadContourSet, List[float]]:
+    level_spacing: float = 5e3,
+) -> Tuple[contour.QuadContourSet, List[float]]:
     """
     Create a contour plot directly from a directory of EMP result JSON files.
-
-    Parameters
-    ----------
-    results_dir : Union[str, Path]
-        Directory containing result JSON files (EmpLosResult).
-    save_path : Optional[str], optional
-        Path to save the plot image, by default None (does not save).
-    show_grid : bool, optional
-        Whether to show grid lines on the plot, by default False.
-    show : bool, optional
-        Whether to display the plot, by default True.
-    gaussian_smooth : bool, optional
-        Whether to apply Gaussian smoothing to the E-field data, by default False.
-    gaussian_sigma : float, optional
-        Standard deviation for Gaussian smoothing, by default 1.0.
-
-    Returns
-    -------
-    Tuple[matplotlib.contour.QuadContourSet, List[float]]
-        The contour set and the contour levels used in the plot.
     """
+
     results_dir = Path(results_dir)
     lat_list, lon_list, E_max_list, burst_point = load_scan_results(results_dir)
 
     fig, ax = plt.subplots(dpi=150, figsize=(14, 10))
 
-    # Create interpolation grid
+    # Create interpolation grid (rectilinear)
     grid_size = 300
     xi = np.linspace(np.min(lon_list), np.max(lon_list), grid_size)
     yi = np.linspace(np.min(lat_list), np.max(lat_list), grid_size)
-    triang = tri.Triangulation(lon_list, lat_list)
-    interpolator = tri.LinearTriInterpolator(triang, E_max_list)
     Xi, Yi = np.meshgrid(xi, yi)
-    zi = interpolator(Xi, Yi)
+
+    # Interpolate using griddata (works better for rectilinear scans)
+    zi = griddata((lon_list, lat_list), E_max_list, (Xi, Yi), method="linear")
 
     # Mask points outside line of sight
     for i, longitude in enumerate(xi):
@@ -176,14 +160,12 @@ def contour_plot(
 
     # Apply Gaussian smoothing if requested
     if gaussian_smooth:
-        # Replace NaN with 0 temporarily (gaussian_filter doesn’t handle NaN)
         mask = np.isnan(zi)
         zi = np.nan_to_num(zi, nan=0.0)
         zi = scipy.ndimage.gaussian_filter(zi, sigma=gaussian_sigma)
-        zi[mask] = np.nan  # restore NaNs
+        zi[mask] = np.nan
 
     # Define contour levels
-    level_spacing = 5e3
     z_min: float = np.nanmin(E_max_list)
     z_max: float = np.nanmax(E_max_list)
     level_min = int(np.floor(z_min / level_spacing)) - 1
@@ -214,6 +196,7 @@ def folium_plot(
     save_path: str,
     gaussian_smooth: bool = True,
     gaussian_sigma: float = 1.0,
+    level_spacing: float = 5e3,
 ) -> folium.Map:
     """
     Create a folium map with EMP contours directly from result JSON files.
@@ -246,6 +229,7 @@ def folium_plot(
         gaussian_smooth=gaussian_smooth,
         gaussian_sigma=gaussian_sigma,
         show=False,
+        level_spacing=level_spacing,
     )
 
     # Convert to GeoJSON
@@ -265,7 +249,7 @@ def folium_plot(
         location=[lat, long],
         width=750,
         height=750,
-        zoom_start=5,
+        zoom_start=4,
         tiles="CartoDB positron",
     )
 
