@@ -348,7 +348,7 @@ class EmpModel:
             )
 
         # Store and build field
-        self.magnetic_field_date = magnetic_field_date
+        self.magnetic_field_date: Optional[Union[str, datetime]] = magnetic_field_date
         kwargs = (
             {"date": magnetic_field_date} if magnetic_field_date is not None else {}
         )

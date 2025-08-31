@@ -6,8 +6,6 @@ See LICENSE and README.md for information on usage and licensing
 import io
 from pathlib import Path
 from typing import (
-    Any,
-    Dict,
     List,
     Optional,
     Tuple,
@@ -24,31 +22,16 @@ import numpy as np
 import scipy.ndimage
 import yaml  # type: ignore
 from cycler import cycler
-from numpy.typing import NDArray
 from PIL import Image
-from tqdm import tqdm
 
 import emp.geometry as geometry
 from emp.config import (
     generate_configs,
     run_configs,
 )
-from emp.constants import (
-    DEFAULT_HOB,
-    EARTH_RADIUS,
-    DEFAULT_Compton_KE,
-    DEFAULT_gamma_yield_fraction,
-    DEFAULT_pulse_param_a,
-    DEFAULT_pulse_param_b,
-    DEFAULT_rtol,
-    DEFAULT_total_yield_kt,
-)
-from emp.geomagnetic_field import MagneticFieldFactory
+from emp.constants import EARTH_RADIUS
 from emp.geometry import Point
-from emp.model import (
-    EmpLosResult,
-    EmpModel,
-)
+from emp.model import EmpLosResult
 
 # Configure matplotlib
 plt.rcParams.update(
@@ -132,67 +115,13 @@ def load_scan_results(
     return lat_list, lon_list, E_max_list, first_burst
 
 
-'''
-def data_dic_to_xyz(
-    data_dic: Dict[str, Any], gaussian_smooth: bool = True, field_type: str = "norm"
-) -> Tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]]:
-    """
-    Convert data dictionary to coordinate arrays for plotting.
-
-    Parameters
-    ----------
-    data_dic : Dict[str, Any]
-        Dictionary containing scan results with field components and coordinates.
-    gaussian_smooth : bool, optional
-        Whether to apply Gaussian smoothing to reduce noise, by default True.
-    field_type : str, optional
-        E-field component to extract: 'norm', 'theta', or 'phi', by default 'norm'.
-
-    Returns
-    -------
-    Tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]]
-        Longitude (x), latitude (y), and field strength (z) arrays.
-
-    Raises
-    ------
-    ValueError
-        If field_type is not one of the supported options.
-    """
-    # Validate field type
-    field_map = {
-        "norm": "max_E_norm_at_ground",
-        "theta": "max_E_theta_at_ground",
-        "phi": "max_E_phi_at_ground",
-    }
-
-    if field_type not in field_map:
-        raise ValueError(
-            f"Invalid field_type '{field_type}'. Must be one of {list(field_map.keys())}"
-        )
-
-    field_strength = data_dic[field_map[field_type]]
-
-    # Apply Gaussian smoothing if requested
-    if gaussian_smooth:
-        field_strength = scipy.ndimage.gaussian_filter(field_strength, sigma=1)
-
-    # Extract coordinates and field values
-    x_coords = data_dic["lamb_T_g"] * 180 / np.pi  # longitude in degrees
-    y_coords = data_dic["phi_T_g"] * 180 / np.pi  # latitude in degrees
-
-    return (
-        np.asarray(x_coords.flatten(), dtype=np.floating),
-        np.asarray(y_coords.flatten(), dtype=np.floating),
-        np.asarray(field_strength.flatten(), dtype=np.floating),
-    )
-'''
-
-
 def contour_plot(
     results_dir: Union[str, Path],
     save_path: Optional[str] = None,
     show_grid: bool = False,
     show: bool = True,
+    gaussian_smooth: bool = False,
+    gaussian_sigma: float = 1.0,
 ) -> Tuple[matplotlib.contour.QuadContourSet, List[float]]:
     """
     Create a contour plot directly from a directory of EMP result JSON files.
@@ -201,19 +130,21 @@ def contour_plot(
     ----------
     results_dir : Union[str, Path]
         Directory containing result JSON files (EmpLosResult).
-    burst_point : Point
-        Burst location for line-of-sight calculations.
     save_path : Optional[str], optional
-        Path to save the figure, by default None.
+        Path to save the plot image, by default None (does not save).
     show_grid : bool, optional
-        Whether to show the grid, by default False.
+        Whether to show grid lines on the plot, by default False.
     show : bool, optional
         Whether to display the plot, by default True.
+    gaussian_smooth : bool, optional
+        Whether to apply Gaussian smoothing to the E-field data, by default False.
+    gaussian_sigma : float, optional
+        Standard deviation for Gaussian smoothing, by default 1.0.
 
     Returns
     -------
     Tuple[matplotlib.contour.QuadContourSet, List[float]]
-        Contour plot object and contour levels.
+        The contour set and the contour levels used in the plot.
     """
     results_dir = Path(results_dir)
     lat_list, lon_list, E_max_list, burst_point = load_scan_results(results_dir)
@@ -239,6 +170,14 @@ def contour_plot(
                 geometry.line_of_sight_check(burst_point, target_point)
             except Exception:
                 zi[j, i] = np.nan
+
+    # Apply Gaussian smoothing if requested
+    if gaussian_smooth:
+        # Replace NaN with 0 temporarily (gaussian_filter doesn’t handle NaN)
+        mask = np.isnan(zi)
+        zi = np.nan_to_num(zi, nan=0.0)
+        zi = scipy.ndimage.gaussian_filter(zi, sigma=gaussian_sigma)
+        zi[mask] = np.nan  # restore NaNs
 
     # Define contour levels
     level_spacing = 5e3
@@ -269,8 +208,9 @@ def contour_plot(
 
 def folium_plot(
     results_dir: Union[str, Path],
-    burst_point: Point,
     save_path: str,
+    gaussian_smooth: bool = True,
+    gaussian_sigma: float = 1.0,
 ) -> folium.Map:
     """
     Create a folium map with EMP contours directly from result JSON files.
@@ -279,22 +219,36 @@ def folium_plot(
     ----------
     results_dir : Union[str, Path]
         Directory containing result JSON files (EmpLosResult).
-    burst_point : Point
-        Ground zero location.
     save_path : str
         Path to save the map image.
+    gaussian_smooth : bool, optional
+        Whether to apply Gaussian smoothing to the E-field data, by default True.
+    gaussian_sigma : float, optional
+        Standard deviation for Gaussian smoothing, by default 1.0.
 
     Returns
     -------
     folium.Map
         Interactive folium map.
     """
+
+    # Retrieve the burst point
+    results_dir = Path(results_dir)
+    _, _, _, burst_point = load_scan_results(results_dir)
+    lat = burst_point.phi_g * 180 / np.pi
+    long = burst_point.lambd_g * 180 / np.pi
+
     contourf, levels = contour_plot(
-        results_dir, burst_point, save_path=None, show=False
+        results_dir,
+        gaussian_smooth=gaussian_smooth,
+        gaussian_sigma=gaussian_sigma,
+        show=False,
     )
 
     # Convert to GeoJSON
-    geojsonf = geojsoncontour.contourf_to_geojson(contourf=contourf)
+    geojsonf = geojsoncontour.contourf_to_geojson(
+        contourf=contourf,
+    )
 
     # Colormap
     cmap = plt.colormaps["RdBu_r"]
@@ -305,7 +259,7 @@ def folium_plot(
 
     # Create base map
     geomap = folium.Map(
-        location=[burst_point.latitude_deg, burst_point.longitude_deg],
+        location=[lat, long],
         width=750,
         height=750,
         zoom_start=5,
@@ -327,7 +281,7 @@ def folium_plot(
     geomap.add_child(colormap)
 
     folium.Marker(
-        location=[burst_point.latitude_deg, burst_point.longitude_deg],
+        location=[lat, long],
         popup="Ground Zero",
         icon=folium.Icon(color="red", icon="flash"),
     ).add_to(geomap)
@@ -335,176 +289,19 @@ def folium_plot(
     _save_map_as_image(geomap, save_path)
 
     return geomap
-
-
-'''
-def contour_plot(
-    x: NDArray[np.floating],
-    y: NDArray[np.floating],
-    z: NDArray[np.floating],
-    burst_point: Point,
-    save_path: Optional[str] = None,
-    show_grid: bool = False,
-    show: bool = True,
-) -> Tuple[matplotlib.contour.QuadContourSet, List[float]]:
-    """
-    Create a contour plot of EMP field strength.
-
-    Parameters
-    ----------
-    x : NDArray[np.floating]
-        Longitude coordinates in degrees.
-    y : NDArray[np.floating]
-        Latitude coordinates in degrees.
-    z : NDArray[np.floating]
-        Field strength values.
-    burst_point : Point
-        Burst location for line-of-sight calculations.
-    save_path : Optional[str], optional
-        Path to save the figure, by default None.
-    show_grid : bool, optional
-        Whether to display grid lines, by default False.
-    show : bool, optional
-        Whether to display the plot, by default True.
-
-    Returns
-    -------
-    Tuple[matplotlib.contour.QuadContourSet, List[float]]
-        Contour plot object and contour levels for use with folium.
-    """
-    fig, ax = plt.subplots(dpi=150, figsize=(14, 10))
-
-    # Create interpolation grid
-    grid_size = 300
-    xi = np.linspace(np.min(x), np.max(x), grid_size)
-    yi = np.linspace(np.min(y), np.max(y), grid_size)
-
-    # Interpolate data onto regular grid
-    triang = tri.Triangulation(x, y)
-    interpolator = tri.LinearTriInterpolator(triang, z)
-    Xi, Yi = np.meshgrid(xi, yi)
-    zi = interpolator(Xi, Yi)
-
-    # Mask points outside line of sight
-    for i, longitude in enumerate(xi):
-        for j, latitude in enumerate(yi):
-            phi = latitude * np.pi / 180
-            lambd = longitude * np.pi / 180
-            target_point = Point(EARTH_RADIUS, phi, lambd, "lat/long geo")
-            try:
-                geometry.line_of_sight_check(burst_point, target_point)
-            except Exception:
-                zi[j, i] = np.nan
-
-    # Define contour levels
-    level_spacing = 5e3  # 5 kV/m spacing
-    z_min: float = np.nanmin(z)
-    z_max: float = np.nanmax(z)
-    level_min = int(np.floor(z_min / level_spacing)) - 1
-    level_max = int(np.ceil(z_max / level_spacing)) + 1
-    levels = [i * level_spacing for i in range(level_min, level_max + 1)]
-
-    # Create contour plots
-    contourf = ax.contourf(xi, yi, zi, levels=levels, cmap="RdBu_r", extend="max")
-    contour_lines = ax.contour(xi, yi, zi, levels=levels, linewidths=1, colors="k")
-
-    # Add labels and formatting
-    ax.clabel(contour_lines, inline=True, fontsize=10, fmt="%.0f")
-    fig.colorbar(contourf, ax=ax, label=r"$E$ [V/m]")
-    ax.set_xlabel(r"Longitude [degrees]", labelpad=10)
-    ax.set_ylabel(r"Latitude [degrees]", labelpad=10)
-    ax.grid(show_grid)
-
-    # Save and/or display
-    if save_path is not None:
-        plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
-    if show:
-        plt.show()
-    else:
-        plt.close()
-
-    return contourf, levels
-
-
-def folium_plot(
-    contourf: matplotlib.contour.QuadContourSet,
-    lat0: float,
-    long0: float,
-    levels: List[float],
-    save_path: str,
-) -> folium.Map:
-    """
-    Create an interactive map with EMP contours overlaid.
-
-    Parameters
-    ----------
-    contourf : matplotlib.contour.QuadContourSet
-        Matplotlib contour object to convert to map overlay.
-    lat0 : float
-        Ground zero latitude in degrees.
-    long0 : float
-        Ground zero longitude in degrees.
-    levels : List[float]
-        Contour levels for colormap.
-    save_path : str
-        Path to save the map image.
-
-    Returns
-    -------
-    folium.Map
-        Interactive folium map object.
-    """
-    # Convert contours to GeoJSON
-    geojsonf = geojsoncontour.contourf_to_geojson(contourf=contourf)
-
-    # Set up colormap
-    cmap = plt.colormaps["RdBu_r"]
-
-    colors = [cmap(x) for x in np.linspace(0, 1, len(levels))]
-    colormap = branca.colormap.LinearColormap(
-        colors, vmin=np.min(levels), vmax=np.max(levels)
-    ).to_step(index=levels)
-
-    # Create base map
-    geomap = folium.Map(
-        location=[lat0, long0],
-        width=750,
-        height=750,
-        zoom_start=5,
-        tiles="CartoDB positron",
-    )
-
-    # Add contour overlay
-    folium.GeoJson(
-        geojsonf,
-        style_function=lambda feature: {
-            "color": "gray",
-            "weight": 1,
-            "fillColor": feature["properties"]["fill"],
-            "opacity": 1,
-            "fillOpacity": 0.5,
-        },
-    ).add_to(geomap)
-
-    # Add colorbar and ground zero marker
-    colormap.caption = "E-field Strength [V/m]"
-    geomap.add_child(colormap)
-
-    folium.Marker(
-        location=[lat0, long0],
-        popup="Ground Zero",
-        icon=folium.Icon(color="red", icon="flash"),
-    ).add_to(geomap)
-
-    # Convert to image and save
-    _save_map_as_image(geomap, save_path)
-
-    return geomap
-'''
 
 
 def _save_map_as_image(geomap: folium.Map, save_path: str) -> None:
-    """Save folium map as a PNG image."""
+    """
+    Save folium map as a PNG image.
+
+    Parameters
+    ----------
+    geomap : folium.Map
+        The folium map to save.
+    save_path : str
+        Path to save the PNG image.
+    """
     img_data = geomap._to_png(delay=10)
     img = Image.open(io.BytesIO(img_data))
 
