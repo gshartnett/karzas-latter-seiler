@@ -612,12 +612,11 @@ def get_line_of_sight_midway_point(point_b: Point, point_t: Point) -> Point:
     return M
 
 
-def line_of_sight_check(burst_point: Point, target_point: Point) -> None:
+def line_of_sight_check(burst_point: Point, target_point: Point) -> bool:
     """
-    Given a burst and target point on the Earth's surface, compute
-    the vector pointing from B to T and confirm that this vector's
-    length is less than the length of the tangent vector pointing from B
-    to a point on the surface.
+    Given a burst and target point, compute the vector pointing from B to T
+    and confirm that this vector's length is less than the length of the
+    tangent vector pointing from B to a point on the surface.
 
     Parameters
     ----------
@@ -626,11 +625,12 @@ def line_of_sight_check(burst_point: Point, target_point: Point) -> None:
     target_point : Point
         Target point.
 
-    Raises
-    ------
-    ValueError
-        If the coordinates have overshot the horizon.
+    Returns
+    -------
+    bool
+        True if the line of sight is valid, False otherwise.
     """
+
     HOB = (
         np.linalg.norm(np.asarray([burst_point.x_g, burst_point.y_g, burst_point.z_g]))
         - EARTH_RADIUS
@@ -639,19 +639,14 @@ def line_of_sight_check(burst_point: Point, target_point: Point) -> None:
     rmax = (EARTH_RADIUS + HOB) * np.cos(Amax)
     xvec_g_B_to_T = get_xvec_g_from_A_to_B(burst_point, target_point)
 
-    # Check distance to target
-    distance = np.linalg.norm(xvec_g_B_to_T)
-    if distance > rmax:
-        raise ValueError(
-            f"Target distance ({distance:.3f}) exceeds maximum line-of-sight distance ({rmax:.3f}). "
-            "Coordinates have overshot the horizon!"
-        )
-
     # Check angle A
     A = get_A_angle(burst_point, target_point)
     if not (0 <= A <= Amax):
-        raise ValueError(
-            f"Line-of-sight angle A ({A:.6f} rad) is outside valid range [0, {Amax:.6f}]. "
-            "Coordinates have overshot the horizon!"
-        )
-    return
+        return False
+
+    # Check distance to target (avoids having a valid angle but on the other side of the planet)
+    distance = np.linalg.norm(xvec_g_B_to_T)
+    if distance > rmax:
+        return False
+
+    return True

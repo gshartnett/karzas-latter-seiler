@@ -23,6 +23,7 @@ import numpy as np
 import scipy.ndimage
 import yaml  # type: ignore
 from cycler import cycler
+from matplotlib.contour import QuadContourSet
 from PIL import Image
 
 import emp.geometry as geometry
@@ -31,7 +32,10 @@ from emp.config import (
     run_configs,
 )
 from emp.constants import EARTH_RADIUS
-from emp.geometry import Point
+from emp.geometry import (
+    Point,
+    line_of_sight_check,
+)
 from emp.model import EmpLosResult
 
 # Configure matplotlib
@@ -167,9 +171,7 @@ def contour_plot(
             phi = latitude * np.pi / 180
             lambd = longitude * np.pi / 180
             target_point = Point(EARTH_RADIUS, phi, lambd, "lat/long geo")
-            try:
-                geometry.line_of_sight_check(burst_point, target_point)
-            except Exception:
+            if not line_of_sight_check(burst_point, target_point):
                 zi[j, i] = np.nan
 
     # Apply Gaussian smoothing if requested

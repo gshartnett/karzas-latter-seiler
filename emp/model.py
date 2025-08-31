@@ -242,7 +242,8 @@ class EmpModel:
         self.HOB = burst_point.r_g - EARTH_RADIUS
 
         # Check line of sight
-        geometry.line_of_sight_check(burst_point, target_point)
+        if not geometry.line_of_sight_check(burst_point, target_point):
+            raise ValueError("Line of sight check failed!")
 
         # Calculate midway point for magnetic field calculations
         self.midway_point = geometry.get_line_of_sight_midway_point(
