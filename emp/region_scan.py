@@ -4,6 +4,7 @@ See LICENSE and README.md for information on usage and licensing
 """
 
 import io
+import shutil
 from pathlib import Path
 from typing import (
     List,
@@ -319,6 +320,45 @@ def _save_map_as_image(geomap: folium.Map, save_path: str) -> None:
     cropped.convert("RGB").save(save_path, dpi=(300, 300))
 
 
+def compute_horizon_bbox(
+    burst_point: Point,
+    safety_margin: float = 1.05,
+) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+    """
+    Compute a latitude/longitude bounding box that contains the
+    horizon ellipse of the burst point.
+
+    Parameters
+    ----------
+    burst_point : Point
+        Burst point in geographic coordinates.
+    safety_margin : float, optional
+        Multiplier to slightly enlarge the bounding box, by default 1.05.
+
+    Returns
+    -------
+    (lat_min, lat_max), (lon_min, lon_max) : tuple of tuples
+        Bounding box in radians.
+    """
+    if burst_point.r_g <= EARTH_RADIUS:
+        raise ValueError("Burst point must be above Earth's surface")
+
+    # Horizon angle
+    theta_h = np.arccos(EARTH_RADIUS / burst_point.r_g)
+
+    # Lat span is symmetric
+    lat_min = burst_point.phi_g - theta_h * safety_margin
+    lat_max = burst_point.phi_g + theta_h * safety_margin
+
+    # Lon span scales with cos(latitude)
+    cos_lat0 = max(np.cos(burst_point.phi_g), 1e-6)  # avoid divide-by-zero
+    lon_halfspan = (theta_h / cos_lat0) * safety_margin
+    lon_min = burst_point.lambd_g - lon_halfspan
+    lon_max = burst_point.lambd_g + lon_halfspan
+
+    return (lat_min, lat_max), (lon_min, lon_max)
+
+
 def region_scan(
     base_config_path: str,
     scan_name: str,
@@ -343,6 +383,13 @@ def region_scan(
         Number of CPU cores to use for running the configurations, by default 1.
     """
 
+    # Delete old configs and results if they exist
+    config_dir = Path("configs") / scan_name
+    results_dir = Path("results") / scan_name
+    for path in [config_dir, results_dir]:
+        if path.exists():
+            shutil.rmtree(path)
+
     # Load base config
     with open(base_config_path, "r") as f:
         base_config = yaml.safe_load(f)
@@ -355,18 +402,16 @@ def region_scan(
         altitude_km=burst_cfg["altitude_km"],
     )
 
-    # Identify grid of angular values
-    delta_angle = 2.0 * geometry.compute_max_delta_angle_2d(burst_point)
-    lat_1d_grid = burst_point.phi_g + np.linspace(
-        -delta_angle / 2, delta_angle / 2, num_points_phi
-    )
-    long_1d_grid = burst_point.lambd_g + np.linspace(
-        -delta_angle / 2, delta_angle / 2, num_points_lambda
-    )
+    # Compute bounding box
+    (lat_min, lat_max), (lon_min, lon_max) = compute_horizon_bbox(burst_point)
 
-    # Convert to list of degrees
-    lat_1d_grid = ((180 / np.pi) * lat_1d_grid).tolist()
-    long_1d_grid = ((180 / np.pi) * long_1d_grid).tolist()
+    # Regular grid inside bounding box
+    lat_1d_grid = np.linspace(lat_min, lat_max, num_points_phi)
+    lon_1d_grid = np.linspace(lon_min, lon_max, num_points_lambda)
+
+    # Convert to degrees
+    lat_1d_grid = np.degrees(lat_1d_grid).tolist()
+    long_1d_grid = np.degrees(lon_1d_grid).tolist()
 
     # Create all config files
     generate_configs(
