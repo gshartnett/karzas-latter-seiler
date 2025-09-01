@@ -122,20 +122,6 @@ def load_scan_results(
     return lat_list, lon_list, E_max_list, first_burst
 
 
-def wrap_longitudes(lon_list, center):
-    """
-    Wrap longitudes to be continuous around a center point.
-
-    Parameters
-    ----------
-    lon_list : array-like
-        Longitudes in radians, range [-pi, pi).
-    center : float
-        Center longitude in radians.
-    """
-    wrapped = (lon_list - center + np.pi) % (2 * np.pi) - np.pi
-    return wrapped + center
-
 
 def contour_plot(
     results_dir: Union[str, Path],
@@ -151,30 +137,39 @@ def contour_plot(
     """
 
     results_dir = Path(results_dir)
-    lat_list, lon_list, E_max_list, burst_point = load_scan_results(results_dir)
+    lat_list, lon_list_deg, E_max_list, burst_point = load_scan_results(results_dir)
 
-    lon_list_wrapped = [
-        (180 / np.pi) * wrap_longitudes(lon_rad * np.pi / 180, burst_point.lambd_g)
-        for lon_rad in lon_list
-    ]
+    # Convert to radians once
+    lon_list = np.radians(lon_list_deg)
+    lat_list = np.array(lat_list)
+
+    # Wrap longitudes in radians
+    def wrap_longitudes(lon_list: np.ndarray, center: float) -> np.ndarray:
+        """
+        Wrap longitudes to be continuous around a center point.
+        """
+        return ((lon_list - center + np.pi) % (2 * np.pi)) - np.pi + center
+
+    lon_wrapped = wrap_longitudes(lon_list, burst_point.lambd_g)
+
+    # For plotting we need degrees
+    lon_wrapped_deg = np.degrees(lon_wrapped)
 
     fig, ax = plt.subplots(dpi=150, figsize=(14, 10))
 
-    # Create interpolation grid (rectilinear)
+    # Create interpolation grid (rectilinear, in degrees)
     grid_size = 300
-    xi = np.linspace(np.min(lon_list_wrapped), np.max(lon_list_wrapped), grid_size)
-    yi = np.linspace(np.min(lat_list), np.max(lat_list), grid_size)
+    xi = np.linspace(lon_wrapped_deg.min(), lon_wrapped_deg.max(), grid_size)
+    yi = np.linspace(lat_list.min(), lat_list.max(), grid_size)
     Xi, Yi = np.meshgrid(xi, yi)
 
-    # Interpolate using griddata (works better for rectilinear scans)
-    zi = griddata((lon_list_wrapped, lat_list), E_max_list, (Xi, Yi), method="linear")
+    # Interpolate (use wrapped degrees for lon)
+    zi = griddata((lon_wrapped_deg, lat_list), E_max_list, (Xi, Yi), method="linear")
 
-    # Mask points outside line of sight
-    for i, longitude in enumerate(xi):
-        for j, latitude in enumerate(yi):
-            phi = latitude * np.pi / 180
-            lambd = wrap_lon_rad(longitude * np.pi / 180)
-            target_point = Point(EARTH_RADIUS, phi, lambd, "lat/long geo")
+    # Mask points outside line of sight (work in radians)
+    for i, longitude in enumerate(np.radians(xi)):
+        for j, latitude in enumerate(np.radians(yi)):
+            target_point = Point(EARTH_RADIUS, latitude, wrap_lon_rad(longitude), "lat/long geo")
             if not line_of_sight_check(burst_point, target_point):
                 zi[j, i] = np.nan
 
@@ -186,8 +181,7 @@ def contour_plot(
         zi[mask] = np.nan
 
     # Define contour levels
-    z_min: float = np.nanmin(E_max_list)
-    z_max: float = np.nanmax(E_max_list)
+    z_min, z_max = np.nanmin(E_max_list), np.nanmax(E_max_list)
     level_min = int(np.floor(z_min / level_spacing)) - 1
     level_max = int(np.ceil(z_max / level_spacing)) + 1
     levels = [i * level_spacing for i in range(level_min, level_max + 1)]
@@ -201,7 +195,7 @@ def contour_plot(
     ax.set_ylabel("Latitude [degrees]")
     ax.grid(show_grid)
 
-    if save_path is not None:
+    if save_path:
         plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
     if show:
         plt.show()
