@@ -1,151 +1,74 @@
 """
 Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
+
+This script runs an EMP line-of-sight calculation using a YAML
+configuration file.
+
+Usage:
+    python run_line_of_sight.py                    # Uses default config: configs/example/basic_line_of_sight.yaml
+    python run_line_of_sight.py my_config.yaml     # Uses specified config file
 """
 
 import argparse
-import os
-import pickle
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from emp.constants import (
-    DEFAULT_A,
-    DEFAULT_HOB,
-    DEFAULT_Bnorm,
-    DEFAULT_Compton_KE,
-    DEFAULT_gamma_yield_fraction,
-    DEFAULT_pulse_param_a,
-    DEFAULT_pulse_param_b,
-    DEFAULT_rtol,
-    DEFAULT_theta,
-    DEFAULT_total_yield_kt,
-)
 from emp.model import EmpModel
 
-# argument parsing
 parser = argparse.ArgumentParser(
-    description="Compute the surface EMP intensity using the Karzas-Latter-Seiler model"
+    description="Run EMP line-of-sight simulation from YAML config"
 )
-
 parser.add_argument(
-    "-HOB", default=DEFAULT_HOB, type=float, help="Height of burst [km]"
+    "config",
+    nargs="?",
+    default="configs/example/basic_line_of_sight.yaml",
+    help="Path to YAML configuration file (default: configs/example/basic_line_of_sight.yaml)",
 )
+args = parser.parse_args()
 
-parser.add_argument(
-    "-Compton_KE",
-    default=DEFAULT_Compton_KE,
-    type=float,
-    help="Kinetic energy of Compton electrons [MeV]",
-)
+config_path = Path(args.config)
+if not config_path.exists():
+    raise ValueError(f"Config file not found: {config_path}")
 
-parser.add_argument(
-    "-total_yield_kt",
-    default=DEFAULT_total_yield_kt,
-    type=float,
-    help="Total weapon yield [kt]",
-)
+print(f"Loading configuration from: {config_path}")
 
-parser.add_argument(
-    "-gamma_yield_fraction",
-    default=DEFAULT_gamma_yield_fraction,
-    type=float,
-    help="Fraction of yield corresponding to prompt gamma rays",
-)
+# Load model from YAML config
+model = EmpModel.from_yaml(config_path)
 
-parser.add_argument(
-    "-Bnorm",
-    default=DEFAULT_Bnorm,
-    type=float,
-    help="Local value of the geomagnetic field strength norm [T]",
-)
+# Run the simulation
+result = model.run()
 
-parser.add_argument(
-    "-theta",
-    default=DEFAULT_theta,
-    type=float,
-    help="Angle between the line-of-sight vector and the geomagnetic field",
-)
+# Save results
+result_path = config_path.parent / f"{config_path.stem}_result.json"
+result.save(result_path)
+print(f"Results saved to: {result_path}")
 
-parser.add_argument(
-    "-A",
-    default=DEFAULT_A,
-    type=float,
-    help="Angle between the line-of-sight vector and the vector normal to the surface of the Earth",
-)
+# Print summary
+print(f"\nSimulation completed:")
+print(f"Maximum field strength: {result.get_max_field_magnitude():.2e} V/m")
+print(f"Time of maximum field: {result.get_max_field_time():.2f} ns")
 
-parser.add_argument(
-    "-pulse_param_a",
-    default=DEFAULT_pulse_param_a,
-    type=float,
-    help="Pulse parameter a [ns^(-1)]",
-)
-
-parser.add_argument(
-    "-pulse_param_b",
-    default=DEFAULT_pulse_param_b,
-    type=float,
-    help="Pulse parameter b [ns^(-1)]",
-)
-
-parser.add_argument(
-    "-rtol",
-    default=DEFAULT_rtol,
-    type=float,
-    help="Relative tolerance used in the ODE integration",
-)
-
-args = vars(parser.parse_args())
-
-# define the model
-model = EmpModel(
-    HOB=args["HOB"],
-    Compton_KE=args["Compton_KE"],
-    total_yield_kt=args["total_yield_kt"],
-    gamma_yield_fraction=args["gamma_yield_fraction"],
-    Bnorm=args["Bnorm"],
-    A=args["A"],
-    theta=args["theta"],
-    pulse_param_a=args["pulse_param_a"],
-    pulse_param_b=args["pulse_param_b"],
-    rtol=args["rtol"],
-)
-
-# print out param values
-print("\nRunning with parameters\n--------------------")
-for key, value in model.__dict__.items():
-    print(key, "=", value)
-print("\n")
-
-# perform the integration
-sol = model.solver(np.linspace(0, 50, 200))
-
-# create data and figure directories
-if not os.path.exists("data"):
-    os.makedirs("data")
-if not os.path.exists("figures"):
-    os.makedirs("figures")
-
-# save the result
-with open("data/emp_solution.pkl", "wb") as f:
-    pickle.dump(sol, f)
-
-# plot the result
+# Create plot
 fig, ax = plt.subplots(1, figsize=(7, 5))
 ax.plot(
-    sol["tlist"],
-    sol["E_norm_at_ground"],
+    result.time_points,
+    result.E_norm_at_ground,
     "-",
     color="k",
     linewidth=1.5,
-    markersize=2,
 )
-ax.set_xlabel(r"$\tau$ \ [ns]")
-ax.set_ylabel(r"E \ [V/m]")
+ax.set_xlabel(r"$\tau$ [ns]")
+ax.set_ylabel(r"E [V/m]")
 plt.minorticks_on()
 plt.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 plt.grid(alpha=0.5)
 plt.title("Surface EMP Intensity")
-plt.savefig("figures/emp_intensity.png", bbox_inches="tight", dpi=600)
+
+# Save figure
+figure_path = config_path.parent / "emp_intensity.png"
+plt.savefig(figure_path, bbox_inches="tight", dpi=600)
+print(f"Figure saved to: {figure_path}")
 plt.show()

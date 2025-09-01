@@ -17,9 +17,11 @@ tqdm = "^4.65.0"
 branca = "^0.4.2"
 cycler = "^0.11.0"
 folium = "^0.12.1"
-geojsoncontour = "^0.4.0"
+geojsoncontour = "^0.5.0"
 ppigrf = "^1.0.2"
 selenium = "^4.17.2"
+types-pyyaml = "^6.0.12.20250822"
+pyyaml = "^6.0.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
@@ -29,6 +31,7 @@ isort = "^5.12.0"
 flake8 = "^6.0.0"
 mypy = "^1.5.0"
 pre-commit = "^3.4.0"
+types-pyyaml = "^6.0.12.20250822"
 
 [tool.poetry.group.docs.dependencies]
 coverage = "^7.0"
