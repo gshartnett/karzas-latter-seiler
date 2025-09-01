@@ -122,6 +122,21 @@ def load_scan_results(
     return lat_list, lon_list, E_max_list, first_burst
 
 
+def wrap_longitudes(lon_list, center):
+    """
+    Wrap longitudes to be continuous around a center point.
+
+    Parameters
+    ----------
+    lon_list : array-like
+        Longitudes in radians, range [-pi, pi).
+    center : float
+        Center longitude in radians.
+    """
+    wrapped = (lon_list - center + np.pi) % (2 * np.pi) - np.pi
+    return wrapped + center
+
+
 def contour_plot(
     results_dir: Union[str, Path],
     save_path: Optional[str] = None,
@@ -138,22 +153,27 @@ def contour_plot(
     results_dir = Path(results_dir)
     lat_list, lon_list, E_max_list, burst_point = load_scan_results(results_dir)
 
+    lon_list_wrapped = [
+        (180 / np.pi) * wrap_longitudes(lon_rad * np.pi / 180, burst_point.lambd_g)
+        for lon_rad in lon_list
+    ]
+
     fig, ax = plt.subplots(dpi=150, figsize=(14, 10))
 
     # Create interpolation grid (rectilinear)
     grid_size = 300
-    xi = np.linspace(np.min(lon_list), np.max(lon_list), grid_size)
+    xi = np.linspace(np.min(lon_list_wrapped), np.max(lon_list_wrapped), grid_size)
     yi = np.linspace(np.min(lat_list), np.max(lat_list), grid_size)
     Xi, Yi = np.meshgrid(xi, yi)
 
     # Interpolate using griddata (works better for rectilinear scans)
-    zi = griddata((lon_list, lat_list), E_max_list, (Xi, Yi), method="linear")
+    zi = griddata((lon_list_wrapped, lat_list), E_max_list, (Xi, Yi), method="linear")
 
     # Mask points outside line of sight
     for i, longitude in enumerate(xi):
         for j, latitude in enumerate(yi):
             phi = latitude * np.pi / 180
-            lambd = longitude * np.pi / 180
+            lambd = wrap_lon_rad(longitude * np.pi / 180)
             target_point = Point(EARTH_RADIUS, phi, lambd, "lat/long geo")
             if not line_of_sight_check(burst_point, target_point):
                 zi[j, i] = np.nan
@@ -339,10 +359,16 @@ def compute_horizon_bbox(
     # Lon span scales with cos(latitude)
     cos_lat0 = max(np.cos(burst_point.phi_g), 1e-6)  # avoid divide-by-zero
     lon_halfspan = (theta_h / cos_lat0) * safety_margin
+
     lon_min = burst_point.lambd_g - lon_halfspan
     lon_max = burst_point.lambd_g + lon_halfspan
 
     return (lat_min, lat_max), (lon_min, lon_max)
+
+
+def wrap_lon_rad(lon: float) -> float:
+    """Wrap longitude into [-pi, pi)."""
+    return (lon + np.pi) % (2 * np.pi) - np.pi
 
 
 def region_scan(
@@ -394,6 +420,9 @@ def region_scan(
     # Regular grid inside bounding box
     lat_1d_grid = np.linspace(lat_min, lat_max, num_points_phi)
     lon_1d_grid = np.linspace(lon_min, lon_max, num_points_lambda)
+
+    # Wrap longitudes to [-pi, pi)
+    lon_1d_grid = np.array([wrap_lon_rad(lon) for lon in lon_1d_grid])
 
     # Convert to degrees
     lat_1d_grid = np.degrees(lat_1d_grid).tolist()

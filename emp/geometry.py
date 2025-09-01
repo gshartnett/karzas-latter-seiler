@@ -201,7 +201,7 @@ class Point:
         if not isinstance(other, Point):
             return False
 
-        tol = 1e-6
+        tol = 1e-4
         return bool(
             np.all(
                 [
