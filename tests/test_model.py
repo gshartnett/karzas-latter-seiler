@@ -518,7 +518,7 @@ def test_conductivity_methods_comparable() -> None:
         assert abs(np.log10(sigma_seiler) - np.log10(sigma_kl)) < 2
 
 
-## ADD a test when target lies b/w the absorption layers
+# TODO: a test when target lies b/w the absorption layers
 
 
 def test_dipole_model_with_date_raises_error() -> None:
