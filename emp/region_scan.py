@@ -122,7 +122,6 @@ def load_scan_results(
     return lat_list, lon_list, E_max_list, first_burst
 
 
-
 def contour_plot(
     results_dir: Union[str, Path],
     save_path: Optional[str] = None,
@@ -169,7 +168,9 @@ def contour_plot(
     # Mask points outside line of sight (work in radians)
     for i, longitude in enumerate(np.radians(xi)):
         for j, latitude in enumerate(np.radians(yi)):
-            target_point = Point(EARTH_RADIUS, latitude, wrap_lon_rad(longitude), "lat/long geo")
+            target_point = Point(
+                EARTH_RADIUS, latitude, wrap_lon_rad(longitude), "lat/long geo"
+            )
             if not line_of_sight_check(burst_point, target_point):
                 zi[j, i] = np.nan
 
