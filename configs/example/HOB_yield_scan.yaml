@@ -12,8 +12,8 @@ model_parameters:
 
 geometry:
   burst_point:
-    latitude_deg: 40.7128
-    longitude_deg: -74.0060
+    latitude_deg: 38.9072
+    longitude_deg: -77.0369
     altitude_km: 100.0
   target_point:
     latitude_deg: 38.9072

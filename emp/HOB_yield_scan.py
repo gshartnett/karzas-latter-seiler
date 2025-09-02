@@ -129,6 +129,7 @@ def contour_plot(
     # Create the plot
     fig, ax = plt.subplots(dpi=150, figsize=(7, 5))
     contourf = ax.contourf(xi, yi, zi, levels=levels, cmap="RdBu_r")
+    ax.contour(xi, yi, zi, levels=levels, linewidths=1, linestyles="-", colors="k")
     clb = fig.colorbar(contourf, ax=ax)
     clb.ax.set_title(r"[V/m]")
     ax.set_xlabel(r"$\log_{10}$ (Y$_{tot}$/(1\, kt))", labelpad=10)
