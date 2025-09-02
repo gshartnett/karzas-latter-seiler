@@ -1,19 +1,32 @@
 """
 Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
+
+Scan over the height of burst (HOB) and yield to generate EMP results.
 """
 
-# imports
+import shutil
+from pathlib import Path
+from typing import (
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import numpy as np
-import scipy
-import scipy.ndimage
+import yaml  # type: ignore
 from cycler import cycler
-from tqdm import tqdm
+from matplotlib import contour
 
-from emp.model import EmpModel
+from emp.config import (
+    generate_configs,
+    run_configs,
+)
+from emp.model import EmpLosResult
 
 plt.rcParams["xtick.direction"] = "in"
 plt.rcParams["ytick.direction"] = "in"
@@ -30,246 +43,188 @@ matplotlib.rcParams["axes.prop_cycle"] = cycler(
 )
 
 
-def data_dic_to_xyz(data_dic, gaussian_smooth=True, field_type="norm"):
+def load_scan_results(
+    results_dir: Union[str, Path]
+) -> Tuple[List[float], List[float], List[float]]:
     """
-    Convert the data into three lists x, y, z, with
-        x - yield
-        y - HOB
-        z - field strength
+    Load all EmpLosResult JSON files in a directory and return HOB, total_yield_kt, max E lists.
 
     Parameters
     ----------
-    data_dic : Dict
-        A dictionary containing the data.
-    gaussian_smooth : bool, optional
-        Boolean flag used to control whether Gaussian smoothing is
-        applied. By default True
-    field_type : str, optional
-        Component of E-field to plot, can be 'norm', 'theta', or 'phi'.
-        By default 'norm'
+    results_dir : Union[str, Path]
+        Directory containing result JSON files.
 
     Returns
     -------
-    Tupe[List[float], List[float], List[float]]
-        Returns the x,y,z lists of the extracted data.
+    Tuple[List[float], List[float], List[float]]
+        HOB, total_yield_kt, max E lists.
     """
-    y = []
-    x = []
-    z = []
+    # Extract the results files
+    results_dir = Path(results_dir)
+    json_files = sorted(results_dir.glob("config_*_result.json"))
+    if not json_files:
+        raise ValueError(f"No result JSON files found in {results_dir}")
 
-    # select which component of E-field to plot (norm, theta, or phi)
-    if field_type == "norm":
-        field_strength = data_dic["max_E_norm_at_ground"]
-    elif field_type == "theta":
-        field_strength = data_dic["max_E_theta_at_ground"]
-    elif field_type == "phi":
-        field_strength = data_dic["max_E_phi_at_ground"]
+    HOB_list, total_yield_kt_list, E_max_list = [], [], []
 
-    # perform gaussian smoothing to make nicer plots
-    # the motivation for this came from this SE post:
-    # https://stackoverflow.com/questions/12274529/how-to-smooth-matplotlib-contour-plot
-    if gaussian_smooth:
-        field_strength = scipy.ndimage.gaussian_filter(field_strength, 1)
+    for file in json_files:
+        result = EmpLosResult.load(file)
+        model_params = result.model_params
 
-    # loop over the arrays and extract the points
-    for i in range(data_dic["HOB"].shape[0]):
-        for j in range(data_dic["HOB"].shape[1]):
-            x.append(data_dic["total_yield_kt"][i, j])
-            y.append(data_dic["HOB"][i, j])
-            z.append(field_strength[i, j])
-    x = np.log(x) / np.log(10)
-    y = np.asarray(y)
-    z = np.asarray(z)
-    return x, y, z
+        HOB_list.append(result.model_params["HOB"])
+        total_yield_kt_list.append(model_params["total_yield_kt"])
+        E_max_list.append(max(result.E_norm_at_ground))
+
+    return HOB_list, total_yield_kt_list, E_max_list
 
 
-def contour_plot(x, y, z, save_path=None, ngrid=50, levels=20):
+def contour_plot(
+    results_dir: Union[str, Path],
+    save_path: Optional[str] = None,
+    show: bool = True,
+    ngrid: int = 50,
+    levels: int = 20,
+) -> contour.QuadContourSet:
     """
-    Build a contour plot of the x, y, z data.
-    Grid interpolation is used.
-
-    TO DO: is the interpolation necessary?
+    Create a contour plot of the EMP field strength based on results from a scan.
 
     Parameters
     ----------
-    x : List[float]
-        A list of the x-values.
-    y : List[float]
-        A list of the y-values.
-    z : List[float]
-        A list of the z-values.
-    save_path : _type_, optional
-        Save path, by default None.
-    grid : bool, optional
-        Boolean flag used to control whether a grid should
-        be displayed. By default False.
+    results_dir : Union[str, Path]
+        Directory containing result JSON files.
+    save_path : Optional[str], optional
+        Path to save the plot, by default None (does not save).
+    show : bool, optional
+        Whether to display the plot, by default True.
+    ngrid : int, optional
+        Number of grid points for interpolation, by default 50.
+    levels : int, optional
+        Number of contour levels, by default 20.
 
     Returns
     -------
-    _type_
-        A contourf object which can be used by folium.
+    contour.QuadContourSet
+        The contour set object.
     """
 
-    fig, ax = plt.subplots(dpi=150, figsize=(7, 5))
+    # Load the results
+    results_dir = Path(results_dir)
+    HOB_list, total_yield_kt_list, E_max_list = load_scan_results(results_dir)
 
-    # create grid values
+    # Give convenient names
+    x = np.log10(total_yield_kt_list).tolist()
+    y = HOB_list
+    z = E_max_list
+
+    # Create grid values
     xi = np.linspace(np.min(x), np.max(x), ngrid)
     yi = np.linspace(np.min(y), np.max(y), ngrid)
 
-    # linearly interpolate the data (x, y) on a grid defined by (xi, yi).
+    # Linearly interpolate the data (x, y) on a grid defined by (xi, yi).
     triang = tri.Triangulation(x, y)
     interpolator = tri.LinearTriInterpolator(triang, z)
     Xi, Yi = np.meshgrid(xi, yi)
     zi = interpolator(Xi, Yi)
 
-    # other interpolation schemes
-    # zi = scipy.interpolate.Rbf(x, y, z, function='linear')(Xi, Yi)
-
-    # Note that scipy.interpolate provides means to interpolate data on a grid
-    # as well. The following would be an alternative to the four lines above:
-    # from scipy.interpolate import griddata
-    # zi = griddata((x, y), z, (xi[None, :], yi[:, None]), method='linear')
-
-    # create the plot
+    # Create the plot
+    fig, ax = plt.subplots(dpi=150, figsize=(7, 5))
     contourf = ax.contourf(xi, yi, zi, levels=levels, cmap="RdBu_r")
-    contour1 = ax.contour(
-        xi, yi, zi, levels=levels, linewidths=1, linestyles="-", colors="k"
-    )
-    # ax.clabel(contour1, inline=True, fontsize=8, colors='k')
     clb = fig.colorbar(contourf, ax=ax)
     clb.ax.set_title(r"[V/m]")
     ax.set_xlabel(r"$\log_{10}$ (Y$_{tot}$/(1\, kt))", labelpad=10)
     ax.set_ylabel(r"HOB [km]", labelpad=10)
-
     ax.set_yticks([55, 100, 150, 200, 250, 300, 350, 400])
-    # xtickslocs = ax.get_xticks()
-    # print(xtickslocs)
-    # ax.set_xticklabels(np.exp(xtickslocs))
 
-    ax.grid(False)
-    if save_path is not None:
+    if save_path:
         plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        plt.close()
 
     return contourf
 
 
-# instantiate a default emp model to copy the default param values
-model_default = EmpModel()
-
-
 def HOB_yield_scan(
-    gamma_yield_fraction=model_default.gamma_yield_fraction,
-    Compton_KE=model_default.Compton_KE,
-    Bnorm=model_default.Bnorm,
-    theta=model_default.theta,
-    A=model_default.A,
-    pulse_param_a=model_default.pulse_param_a,
-    pulse_param_b=model_default.pulse_param_b,
-    rtol=model_default.rtol,
-    N_pts_HOB=20,
-    N_pts_yield=20,
-    HOB_min=55.0,
-    HOB_max=400.0,
-    yield_min=1.0,
-    yield_max=int(1e3),
-    time_max=200.0,
-    N_pts_time=150,
-):
+    base_config_path: str,
+    scan_name: str,
+    N_pts_HOB: int = 20,
+    N_pts_yield: int = 20,
+    HOB_min: float = 55.0,
+    HOB_max: float = 400.0,
+    yield_min: float = 1.0,
+    yield_max: float = 1e3,
+    num_cores: int = 1,
+) -> None:
     """
-    Performs a scan of the HOB and yield parameters.
+    Generate and run a regional EMP scan based on a base configuration file.
 
     Parameters
     ----------
-    gamma_yield_fraction : float, optional
-        Fraction of total weapon yield devoted to gamma radiation,
-        by default model_default.gamma_yield_fraction.
-    Compton_KE : float, optional
-        Kinetic energy of Comptons, by default model_default.Compton_KE.
-    Bnorm : float, optional
-        Norm of B-field, by default model_default.Bnorm.
-    theta : float, optional
-        Angle b/w line of sight and B-field, by default model_default.theta.
-    A : float, optional
-        Angle b/w line of sight and vertical, by default model_default.A.
-    pulse_param_a : float, optional
-        Pulse parameter a, by default model_default.pulse_param_a.
-    pulse_param_b : float, optional
-        Pulse paramater b, by default model_default.pulse_param_b.
-    rtol : float, optional
-        Relative tolerance for integration, by default model_default.rtol.
+    base_config_path : str
+        Path to the base configuration file.
+    scan_name : str
+        Name for the scan, used to create output directory and config files.
     N_pts_HOB : int, optional
-        Number of grid points for the HOB scan, by default 20.
+        Number of HOB values to scan, by default 20.
     N_pts_yield : int, optional
-        Number of grid points for the yield scan, by default 20.
+        Number of yield values to scan, by default 20.
     HOB_min : float, optional
-        Lower limit of HOB values to consider, by default 55.0.
+        Minimum HOB value, by default 55.0.
     HOB_max : float, optional
-        Upper limit of HOB values to consider, by default 400.0.
+        Maximum HOB value, by default 400.0.
     yield_min : float, optional
-        Lower limit of yield values to consider, by default 1.0.
-    yield_max : _type_, optional
-        Upper limit of yield values to consider, by default int(1e3).
-    time_max : float, optional
-        Maximum integration time, by default 200.0.
-    N_pts_time : int, optional
-        Number of temporal grid points, by default 150.
-
-    Returns
-    -------
-    Dict
-        A dictionary containing the results.
+        Minimum yield value, by default 1.0.
+    yield_max : float, optional
+        Maximum yield value, by default 1e3.
+    num_cores : int, optional
+        Number of CPU cores to use for parallel processing, by default 1.
     """
 
-    # grids
-    # use log-linear for HOB, yield
-    time_list = np.linspace(0, time_max, N_pts_time)
-    HOB_list = np.exp(np.linspace(np.log(HOB_min), np.log(HOB_max), N_pts_HOB))
-    total_yield_kt_list = np.exp(
-        np.linspace(np.log(yield_min), np.log(yield_max), N_pts_yield)
+    # Delete old configs and results if they exist
+    config_dir = Path("configs") / scan_name
+    results_dir = Path("results") / scan_name
+    for path in [config_dir, results_dir]:
+        if path.exists():
+            shutil.rmtree(path)
+
+    # Load base config
+    with open(base_config_path, "r") as f:
+        base_config = yaml.safe_load(f)
+
+    # Extract burst point from base config
+    burst_cfg = base_config["geometry"]["burst_point"]
+
+    # Generate a list of HOBs ranging from HOB_min to HOB_max
+    HOB_list = np.linspace(HOB_min, HOB_max, N_pts_HOB).tolist()
+
+    # Generate a list of total_yield_kt values ranging from yield_min to yield_max
+    total_yield_kt_list = np.linspace(yield_min, yield_max, N_pts_yield).tolist()
+
+    # Create all config files
+    generate_configs(
+        base_config_path=base_config_path,
+        output_dir="configs",
+        scan_name=scan_name,
+        parameters={
+            "model_parameters": {
+                "total_yield_kt": total_yield_kt_list,
+            },
+            "geometry": {
+                "burst_point": {
+                    "latitude_deg": burst_cfg["latitude_deg"],
+                    "longitude_deg": burst_cfg["longitude_deg"],
+                    "altitude_km": HOB_list,
+                }
+            },
+        },
     )
 
-    # initialize data dictionary
-    data_dic = {
-        "max_E_norm_at_ground": np.zeros((N_pts_HOB, N_pts_yield)),
-        "max_E_theta_at_ground": np.zeros((N_pts_HOB, N_pts_yield)),
-        "max_E_phi_at_ground": np.zeros((N_pts_HOB, N_pts_yield)),
-        "HOB": np.zeros((N_pts_HOB, N_pts_yield)),
-        "total_yield_kt": np.zeros((N_pts_HOB, N_pts_yield)),
-    }
+    # Run all config files
+    run_configs(
+        config_dir=f"configs/{scan_name}",
+        results_dir=f"results/{scan_name}",
+        num_cores=num_cores,
+    )
 
-    # loop over HOB
-    for i in tqdm(range(N_pts_HOB)):
-        # loop over yield
-        for j in tqdm(range(N_pts_yield), leave=bool(i == N_pts_HOB - 1)):
-            # update params
-            HOB = HOB_list[i]
-            total_yield_kt = total_yield_kt_list[j]
-
-            # define new EMP model and solve it
-            model = EmpModel(
-                HOB=HOB,
-                Compton_KE=Compton_KE,
-                total_yield_kt=total_yield_kt,
-                gamma_yield_fraction=gamma_yield_fraction,
-                pulse_param_a=pulse_param_a,
-                pulse_param_b=pulse_param_b,
-                rtol=rtol,
-                A=A,
-                Bnorm=Bnorm,
-                theta=theta,
-            )
-            sol = model.solver(time_list)
-
-            # store results
-            data_dic["max_E_norm_at_ground"][i, j] = np.max(sol["E_norm_at_ground"])
-            data_dic["max_E_theta_at_ground"][i, j] = np.max(
-                np.abs(sol["E_theta_at_ground"])
-            )
-            data_dic["max_E_phi_at_ground"][i, j] = np.max(
-                np.abs(sol["E_phi_at_ground"])
-            )
-            data_dic["HOB"][i, j] = model.HOB
-            data_dic["total_yield_kt"][i, j] = model.total_yield_kt
-
-    return data_dic
+    return

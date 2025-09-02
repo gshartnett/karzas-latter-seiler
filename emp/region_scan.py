@@ -1,6 +1,8 @@
 """
 Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
+
+Scan latitudes and longitudes around a burst point to generate EMP results and the famous "smile diagrams".
 """
 
 import io
@@ -122,11 +124,9 @@ def load_scan_results(
     return lat_list, lon_list, E_max_list, first_burst
 
 
-
 def contour_plot(
     results_dir: Union[str, Path],
     save_path: Optional[str] = None,
-    show_grid: bool = False,
     show: bool = True,
     gaussian_smooth: bool = False,
     gaussian_sigma: float = 1.0,
@@ -169,7 +169,9 @@ def contour_plot(
     # Mask points outside line of sight (work in radians)
     for i, longitude in enumerate(np.radians(xi)):
         for j, latitude in enumerate(np.radians(yi)):
-            target_point = Point(EARTH_RADIUS, latitude, wrap_lon_rad(longitude), "lat/long geo")
+            target_point = Point(
+                EARTH_RADIUS, latitude, wrap_lon_rad(longitude), "lat/long geo"
+            )
             if not line_of_sight_check(burst_point, target_point):
                 zi[j, i] = np.nan
 
@@ -193,7 +195,6 @@ def contour_plot(
     fig.colorbar(contourf, ax=ax, label=r"$E$ [V/m]")
     ax.set_xlabel("Longitude [degrees]")
     ax.set_ylabel("Latitude [degrees]")
-    ax.grid(show_grid)
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
