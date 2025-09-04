@@ -8,6 +8,7 @@ Scan over the height of burst (HOB) and yield to generate EMP results.
 import shutil
 from pathlib import Path
 from typing import (
+    Dict,
     List,
     Optional,
     Tuple,
@@ -43,9 +44,7 @@ matplotlib.rcParams["axes.prop_cycle"] = cycler(
 )
 
 
-def load_scan_results(
-    results_dir: Union[str, Path]
-) -> Tuple[List[float], List[float], List[float]]:
+def load_scan_results(results_dir: Union[str, Path]) -> Dict[str, List[float]]:
     """
     Load all EmpLosResult JSON files in a directory and return HOB, total_yield_kt, max E lists.
 
@@ -56,8 +55,8 @@ def load_scan_results(
 
     Returns
     -------
-    Tuple[List[float], List[float], List[float]]
-        HOB, total_yield_kt, max E lists.
+    Dict[str, List[float]]
+        Dictionary with keys 'HOB_list', 'total_yield_kt_list', and 'E_max_list'.
     """
     # Extract the results files
     results_dir = Path(results_dir)
@@ -75,7 +74,11 @@ def load_scan_results(
         total_yield_kt_list.append(model_params["total_yield_kt"])
         E_max_list.append(max(result.E_norm_at_ground))
 
-    return HOB_list, total_yield_kt_list, E_max_list
+    return {
+        "HOB_list": HOB_list,
+        "total_yield_kt_list": total_yield_kt_list,
+        "E_max_list": E_max_list,
+    }
 
 
 def contour_plot(
@@ -109,7 +112,10 @@ def contour_plot(
 
     # Load the results
     results_dir = Path(results_dir)
-    HOB_list, total_yield_kt_list, E_max_list = load_scan_results(results_dir)
+    loaded_results = load_scan_results(results_dir)
+    HOB_list = loaded_results["HOB_list"]
+    total_yield_kt_list = loaded_results["total_yield_kt_list"]
+    E_max_list = loaded_results["E_max_list"]
 
     # Give convenient names
     x = np.log10(total_yield_kt_list).tolist()
@@ -200,7 +206,9 @@ def HOB_yield_scan(
     HOB_list = np.linspace(HOB_min, HOB_max, N_pts_HOB).tolist()
 
     # Generate a list of total_yield_kt values ranging from yield_min to yield_max (logarithmic spacing)
-    total_yield_kt_list = np.exp(np.linspace(np.log(yield_min), np.log(yield_max), N_pts_yield)).tolist()
+    total_yield_kt_list = np.exp(
+        np.linspace(np.log(yield_min), np.log(yield_max), N_pts_yield)
+    ).tolist()
 
     # Create all config files
     generate_configs(

@@ -9,6 +9,7 @@ import io
 import shutil
 from pathlib import Path
 from typing import (
+    Dict,
     List,
     Optional,
     Tuple,
@@ -73,7 +74,7 @@ plt.rcParams.update(
 
 def load_scan_results(
     results_dir: Union[str, Path]
-) -> Tuple[List[float], List[float], List[float], Point]:
+) -> Dict[str, Union[List[float], Point]]:
     """
     Load all EmpLosResult JSON files in a directory and return lat, lon, max E lists,
     as well as burst point (verifying all results share the same burst point).
@@ -85,7 +86,7 @@ def load_scan_results(
 
     Returns
     -------
-    Tuple[List[float], List[float], List[float], Point]
+    Dict[str, Union[List[float], Point]]
         latitudes, longitudes, max E-field magnitudes, and burst point.
     """
     # Extract the results files
@@ -121,7 +122,12 @@ def load_scan_results(
         if bp != first_burst:
             raise ValueError("Not all results share the same burst point!")
 
-    return lat_list, lon_list, E_max_list, first_burst
+    return {
+        "lat_list": lat_list,
+        "lon_list": lon_list,
+        "E_max_list": E_max_list,
+        "burst_point": first_burst,
+    }
 
 
 def contour_plot(
@@ -137,7 +143,11 @@ def contour_plot(
     """
 
     results_dir = Path(results_dir)
-    lat_list, lon_list_deg, E_max_list, burst_point = load_scan_results(results_dir)
+    loaded_results = load_scan_results(results_dir)
+    lat_list = loaded_results["lat_list"]
+    lon_list_deg = loaded_results["lon_list"]
+    E_max_list = loaded_results["E_max_list"]
+    burst_point = loaded_results["burst_point"]
 
     # Convert to radians once
     lon_list = np.radians(lon_list_deg)
@@ -235,7 +245,7 @@ def folium_plot(
 
     # Retrieve the burst point
     results_dir = Path(results_dir)
-    _, _, _, burst_point = load_scan_results(results_dir)
+    burst_point = load_scan_results(results_dir)["burst_point"]
     lat = burst_point.phi_g * 180 / np.pi
     long = burst_point.lambd_g * 180 / np.pi
 
