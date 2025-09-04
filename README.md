@@ -9,17 +9,17 @@ This repository contains Python code for modeling the early (E1) phase of a high
 
 ## Contents
 The repository is organized as follows:
-- `configs/` contains configuration yaml files
-    - `example/basic_line_of_sight.yaml` simple example for a single line of sight integration
+- `configs/` contains configuration yaml files:
+    - `example/basic_line_of_sight.yaml` simple example for a single line of sight integration.
     - `historical_detonations/` contains config files for historical high-altitude tests, such as the Soviet K-series tests or the US StarfishPrime test.
-- `emp/` contains the core code for the package
-    - `emp/model.py`: contains the EMP model class and other useful functions
-    - `emp/geometry.py`: contains code for geometrical calculations
-    - `emp/geomagnetic_field.py`: contains code for handling Earth's magnetic field
-    - `emp/constants.py`: contains constants of nature and default model parameters
-    - `emp/region_scan.py`: contains code for scanning over a range of target points and creating the "smile" diagrams
-    - `emp/HOB_yield_scan.py`: contains code for scanning over a range of height of burst (HOB) values and yields
-- `scripts/run_line_of_sight.py`: performs a single line of sight integration
+- `emp/` contains the core code for the package:
+    - `emp/model.py`: contains the EMP model class and other useful functions.
+    - `emp/geometry.py`: contains code for geometrical calculations.
+    - `emp/geomagnetic_field.py`: contains code for handling Earth's magnetic field.
+    - `emp/constants.py`: contains constants of nature and default model parameters.
+    - `emp/region_scan.py`: contains code for scanning over a range of target points and creating the "smile" diagrams.
+    - `emp/HOB_yield_scan.py`: contains code for scanning over a range of height of burst (HOB) values and yields.
+- `scripts/run_line_of_sight.py`: performs a single line of sight integration.
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
 
 For more information, see the Sphinx docs available [here](https://gshartnett.github.io/karzas-latter-seiler/).
