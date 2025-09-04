@@ -1,12 +1,15 @@
 """
 Copyright (C) 2023 by The RAND Corporation
 See LICENSE and README.md for information on usage and licensing
+
+Scan latitudes and longitudes around a burst point to generate EMP results and the famous "smile diagrams".
 """
 
 import io
 import shutil
 from pathlib import Path
 from typing import (
+    Dict,
     List,
     Optional,
     Tuple,
@@ -71,7 +74,7 @@ plt.rcParams.update(
 
 def load_scan_results(
     results_dir: Union[str, Path]
-) -> Tuple[List[float], List[float], List[float], Point]:
+) -> Dict[str, Union[List[float], Point]]:
     """
     Load all EmpLosResult JSON files in a directory and return lat, lon, max E lists,
     as well as burst point (verifying all results share the same burst point).
@@ -83,7 +86,7 @@ def load_scan_results(
 
     Returns
     -------
-    Tuple[List[float], List[float], List[float], Point]
+    Dict[str, Union[List[float], Point]]
         latitudes, longitudes, max E-field magnitudes, and burst point.
     """
     # Extract the results files
@@ -119,14 +122,17 @@ def load_scan_results(
         if bp != first_burst:
             raise ValueError("Not all results share the same burst point!")
 
-    return lat_list, lon_list, E_max_list, first_burst
-
+    return {
+        "lat_list": lat_list,
+        "lon_list": lon_list,
+        "E_max_list": E_max_list,
+        "burst_point": first_burst,
+    }
 
 
 def contour_plot(
     results_dir: Union[str, Path],
     save_path: Optional[str] = None,
-    show_grid: bool = False,
     show: bool = True,
     gaussian_smooth: bool = False,
     gaussian_sigma: float = 1.0,
@@ -137,7 +143,11 @@ def contour_plot(
     """
 
     results_dir = Path(results_dir)
-    lat_list, lon_list_deg, E_max_list, burst_point = load_scan_results(results_dir)
+    loaded_results = load_scan_results(results_dir)
+    lat_list = loaded_results["lat_list"]
+    lon_list_deg = loaded_results["lon_list"]
+    E_max_list = loaded_results["E_max_list"]
+    burst_point = loaded_results["burst_point"]
 
     # Convert to radians once
     lon_list = np.radians(lon_list_deg)
@@ -169,7 +179,9 @@ def contour_plot(
     # Mask points outside line of sight (work in radians)
     for i, longitude in enumerate(np.radians(xi)):
         for j, latitude in enumerate(np.radians(yi)):
-            target_point = Point(EARTH_RADIUS, latitude, wrap_lon_rad(longitude), "lat/long geo")
+            target_point = Point(
+                EARTH_RADIUS, latitude, wrap_lon_rad(longitude), "lat/long geo"
+            )
             if not line_of_sight_check(burst_point, target_point):
                 zi[j, i] = np.nan
 
@@ -193,7 +205,6 @@ def contour_plot(
     fig.colorbar(contourf, ax=ax, label=r"$E$ [V/m]")
     ax.set_xlabel("Longitude [degrees]")
     ax.set_ylabel("Latitude [degrees]")
-    ax.grid(show_grid)
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
@@ -234,7 +245,7 @@ def folium_plot(
 
     # Retrieve the burst point
     results_dir = Path(results_dir)
-    _, _, _, burst_point = load_scan_results(results_dir)
+    burst_point = load_scan_results(results_dir)["burst_point"]
     lat = burst_point.phi_g * 180 / np.pi
     long = burst_point.lambd_g * 180 / np.pi
 
