@@ -199,8 +199,8 @@ def HOB_yield_scan(
     # Generate a list of HOBs ranging from HOB_min to HOB_max
     HOB_list = np.linspace(HOB_min, HOB_max, N_pts_HOB).tolist()
 
-    # Generate a list of total_yield_kt values ranging from yield_min to yield_max
-    total_yield_kt_list = np.linspace(yield_min, yield_max, N_pts_yield).tolist()
+    # Generate a list of total_yield_kt values ranging from yield_min to yield_max (logarithmic spacing)
+    total_yield_kt_list = np.exp(np.linspace(np.log(yield_min), np.log(yield_max), N_pts_yield)).tolist()
 
     # Create all config files
     generate_configs(
