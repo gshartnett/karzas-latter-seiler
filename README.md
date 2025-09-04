@@ -9,6 +9,9 @@ This repository contains Python code for modeling the early (E1) phase of a high
 
 ## Contents
 The repository is organized as follows:
+- `configs/` contains configuration yaml files
+    - `example/basic_line_of_sight.yaml` simple example for a single line of sight integration
+    - `historical_detonations/` contains config files for historical high-altitude tests, such as the Soviet K-series tests or the US StarfishPrime test.
 - `emp/` contains the core code for the package
     - `emp/model.py`: contains the EMP model class and other useful functions
     - `emp/geometry.py`: contains code for geometrical calculations
@@ -16,11 +19,7 @@ The repository is organized as follows:
     - `emp/constants.py`: contains constants of nature and default model parameters
     - `emp/region_scan.py`: contains code for scanning over a range of target points and creating the "smile" diagrams
     - `emp/HOB_yield_scan.py`: contains code for scanning over a range of height of burst (HOB) values and yields
-- `scripts/` contains Python scripts used to run the model in various use cases
-    - `scripts/run_line_of_sight.py`: perform a single line of sight integration
-    - `scripts/run_region_scan.py`: perform a 2d scan over latitude and longitude coordinates and make the "smile" diagram
-    - `scripts/run_HOB_yield_scan.py`: perform a scan over the height of burst (HOB) and yield
-- `notebooks/` contains a Jupyter notebook used to illustrate how to use the code
+- `scripts/run_line_of_sight.py`: performs a single line of sight integration
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
 
 For more information, see the Sphinx docs available [here](https://gshartnett.github.io/karzas-latter-seiler/).
