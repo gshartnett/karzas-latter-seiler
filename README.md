@@ -19,7 +19,8 @@ The repository is organized as follows:
     - `emp/constants.py`: contains constants of nature and default model parameters.
     - `emp/region_scan.py`: contains code for scanning over a range of target points and creating the "smile" diagrams.
     - `emp/HOB_yield_scan.py`: contains code for scanning over a range of height of burst (HOB) values and yields.
-- `scripts/run_line_of_sight.py`: performs a single line of sight integration.
+- `scripts/` contains scripts for running the model:
+    - `run_line_of_sight.py`: performs a single line of sight integration.
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
 
 For more information, see the Sphinx docs available [here](https://gshartnett.github.io/karzas-latter-seiler/).
