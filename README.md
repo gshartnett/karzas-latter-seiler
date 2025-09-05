@@ -10,7 +10,7 @@ This repository contains Python code for modeling the early (E1) phase of a high
 ## Contents
 The repository is organized as follows:
 - `configs/` contains configuration yaml files:
-    - `example/basic_line_of_sight.yaml` simple example for a single line of sight integration.
+    - `example/basic_line_of_sight.yaml`: simple example for a single line of sight integration.
     - `historical_detonations/` contains config files for historical high-altitude tests, such as the Soviet K-series tests or the US StarfishPrime test.
 - `emp/` contains the core code for the package:
     - `emp/model.py`: contains the EMP model class and other useful functions.
