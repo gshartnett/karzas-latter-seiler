@@ -3,14 +3,20 @@
 # The Karzas-Latter-Seiler Model of a High-Altitude Electromagnetic Pulse
 
 ## Introduction
-This repository contains Python code for modeling the early (E1) phase of a high-altitude electromagnetic pulse (EMP). The EMP is modeled using a variant of the well-known [Karzas-Latter model](https://journals.aps.org/pr/abstract/10.1103/PhysRev.137.B1369) introduced by [Seiler](https://apps.dtic.mil/sti/citations/ADA009208). The code may be used to produce the characteristic "smile diagrams", which depict the peak intensity of the electric field over the surface of the Earth. The diagram below corresponds to a blast detonated 100 km directly overhead Topeka, Kansas.
+This repository contains Python code for modeling the early (E1) phase of a high-altitude electromagnetic pulse (EMP). The EMP is modeled using a variant of the well-known [Karzas-Latter model](https://journals.aps.org/pr/abstract/10.1103/PhysRev.137.B1369) introduced by [Seiler](https://apps.dtic.mil/sti/citations/ADA009208). This repo is accompanied by a companion paper:
+- [arXiv version](https://arxiv.org/pdf/2402.14864)
+- [RAND Working Report version](https://www.rand.org/pubs/working_papers/WRA879-2.html)
 
-<img src="Topeka_smile.png" alt="Topeka" width="1000"/>
+The code may be used to produce the characteristic "smile diagrams", which depict the peak intensity of the electric field over the surface of the Earth. The diagram below corresponds to a blast detonated 100 km directly overhead Topeka, Kansas.
+
+<div align="center">
+    <img src="Topeka_smile.png" alt="Topeka" width="500"/>
+</div>
 
 ## Contents
 The repository is organized as follows:
 - `configs/` contains configuration yaml files:
-    - `example/basic_line_of_sight.yaml` simple example for a single line of sight integration.
+    - `example/basic_line_of_sight.yaml`: simple example for a single line of sight integration.
     - `historical_detonations/` contains config files for historical high-altitude tests, such as the Soviet K-series tests or the US StarfishPrime test.
 - `emp/` contains the core code for the package:
     - `emp/model.py`: contains the EMP model class and other useful functions.
@@ -19,7 +25,8 @@ The repository is organized as follows:
     - `emp/constants.py`: contains constants of nature and default model parameters.
     - `emp/region_scan.py`: contains code for scanning over a range of target points and creating the "smile" diagrams.
     - `emp/HOB_yield_scan.py`: contains code for scanning over a range of height of burst (HOB) values and yields.
-- `scripts/run_line_of_sight.py`: performs a single line of sight integration.
+- `scripts/` contains scripts for running the model:
+    - `run_line_of_sight.py`: performs a single line of sight integration.
 - `Seiler Digitized Data` a directory containing digitized data from select figures in the original Seiler report. The data was digitized using [this online tool](https://apps.automeris.io/wpd/).
 
 For more information, see the Sphinx docs available [here](https://gshartnett.github.io/karzas-latter-seiler/).
@@ -39,7 +46,11 @@ conda create -n emp python=3.11
 conda activate emp
 
 # Clone repository
+# For HTTPS (more accessible for new users)
+git clone https://github.com/gshartnett/karzas-latter-seiler.git
+# Or for SSH (requires SSH key setup)
 git clone git@github.com:gshartnett/karzas-latter-seiler.git
+
 cd karzas-latter-seiler
 
 # Install Poetry if not already installed
