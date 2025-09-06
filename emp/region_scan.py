@@ -72,6 +72,13 @@ plt.rcParams.update(
 )
 
 
+def wrap_longitudes(lon_list: np.ndarray, center: float) -> np.ndarray:
+    """
+    Wrap longitudes to be continuous around a center point.
+    """
+    return ((lon_list - center + np.pi) % (2 * np.pi)) - np.pi + center
+
+
 def load_scan_results(
     results_dir: Union[str, Path]
 ) -> Dict[str, Union[List[float], Point]]:
@@ -154,12 +161,6 @@ def contour_plot(
     lat_list = np.array(lat_list)
 
     # Wrap longitudes in radians
-    def wrap_longitudes(lon_list: np.ndarray, center: float) -> np.ndarray:
-        """
-        Wrap longitudes to be continuous around a center point.
-        """
-        return ((lon_list - center + np.pi) % (2 * np.pi)) - np.pi + center
-
     lon_wrapped = wrap_longitudes(lon_list, burst_point.lambd_g)
 
     # For plotting we need degrees
