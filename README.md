@@ -3,9 +3,15 @@
 # The Karzas-Latter-Seiler Model of a High-Altitude Electromagnetic Pulse
 
 ## Introduction
-This repository contains Python code for modeling the early (E1) phase of a high-altitude electromagnetic pulse (EMP). The EMP is modeled using a variant of the well-known [Karzas-Latter model](https://journals.aps.org/pr/abstract/10.1103/PhysRev.137.B1369) introduced by [Seiler](https://apps.dtic.mil/sti/citations/ADA009208). The code may be used to produce the characteristic "smile diagrams", which depict the peak intensity of the electric field over the surface of the Earth. The diagram below corresponds to a blast detonated 100 km directly overhead Topeka, Kansas.
+This repository contains Python code for modeling the early (E1) phase of a high-altitude electromagnetic pulse (EMP). The EMP is modeled using a variant of the well-known [Karzas-Latter model](https://journals.aps.org/pr/abstract/10.1103/PhysRev.137.B1369) introduced by [Seiler](https://apps.dtic.mil/sti/citations/ADA009208). This repo is accompanied by a companion paper:
+- [arXiv version](https://arxiv.org/pdf/2402.14864)
+- [RAND Working Report version](https://www.rand.org/pubs/working_papers/WRA879-2.html)
 
-<img src="Topeka_smile.png" alt="Topeka" width="1000"/>
+The code may be used to produce the characteristic "smile diagrams", which depict the peak intensity of the electric field over the surface of the Earth. The diagram below corresponds to a blast detonated 100 km directly overhead Topeka, Kansas.
+
+<div align="center">
+    <img src="Topeka_smile.png" alt="Topeka" width="500"/>
+</div>
 
 ## Contents
 The repository is organized as follows:
@@ -40,7 +46,11 @@ conda create -n emp python=3.11
 conda activate emp
 
 # Clone repository
+# For HTTPS (more accessible for new users)
+git clone https://github.com/gshartnett/karzas-latter-seiler.git
+# Or for SSH (requires SSH key setup)
 git clone git@github.com:gshartnett/karzas-latter-seiler.git
+
 cd karzas-latter-seiler
 
 # Install Poetry if not already installed
