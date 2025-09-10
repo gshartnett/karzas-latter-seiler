@@ -87,6 +87,49 @@ def _flatten_parameters(
     return items
 
 
+def load_and_update_config(
+    reference_filepath: Union[str, Path], parameters: Dict[str, Any]
+) -> Dict:
+    """
+    Load a specified configuration file, update selected parameters, and output the corresponding dictionary.
+    Useful for calibrating based on a reference config file.
+
+    Parameters
+    ----------
+    reference_filepath : Union[str, Path]
+        Path to the reference YAML configuration file
+    parameters : Dict[str, Any]
+        Dictionary mapping parameters (can be nested) to values
+
+    Returns
+    -------
+    Dict
+        Updated configuration dictionary
+    """
+    # Load model configuration parameters
+    with open(reference_filepath, "r") as f:
+        config_dict = yaml.safe_load(f)
+
+    # Flatten parameters (nested dict -> dot notation)
+    flat_parameters = _flatten_parameters(parameters)
+
+    # Update config dictionary with new param values
+    for param_path, values in flat_parameters.items():
+        # _flatten_parameters returns lists, so take the first (and only) value
+        value = values[0]
+
+        if param_path == "joint_latitude_deg":
+            # Special handling for joint_latitude_deg - set both burst and target point latitudes
+            set_nested_param(config_dict, "geometry.burst_point.latitude_deg", value)
+            set_nested_param(config_dict, "geometry.target_point.latitude_deg", value)
+        else:
+            # Normal parameter setting
+            set_nested_param(config_dict, param_path, value)
+
+    return config_dict
+
+
+'''
 def generate_configs(
     base_config_path: Union[str, Path],
     output_dir: Union[str, Path],
@@ -141,6 +184,70 @@ def generate_configs(
                     current[key] = {}
                 current = current[key]
             current[keys[-1]] = value
+
+        # Save configuration with sequential filename
+        output_filename = f"config_{i:04d}.yaml"
+        with open(output_dir_with_scan_name / output_filename, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False, indent=2)
+
+    logger.info(
+        f"Generated {len(combinations)} configurations in {output_dir_with_scan_name}"
+    )
+
+    return output_dir_with_scan_name
+'''
+
+
+def generate_configs(
+    base_config_path: Union[str, Path],
+    output_dir: Union[str, Path],
+    scan_name: str,
+    parameters: Dict[str, Any],
+) -> Path:
+    """
+    Generate multiple configuration files from a base config by varying specified parameters.
+
+    Parameters
+    ----------
+    base_config_path : Union[str, Path]
+        Path to the base YAML configuration file
+    output_dir : str
+        Directory where generated config files will be saved.
+    scan_name : str
+        Name for this scan (used in directory and file names)
+    parameters : Dict[str, Any]
+        Dictionary mapping parameters (can be nested) to lists or scalars
+
+    Returns
+    -------
+    Path
+        Path to the directory where configs were generated.
+    """
+    base_config_path = Path(base_config_path)
+    if not base_config_path.exists():
+        raise FileNotFoundError(f"Base config file not found: {base_config_path}")
+
+    # Ensure output directory exists
+    output_dir_with_scan_name = Path(output_dir) / scan_name
+    output_dir_with_scan_name.mkdir(parents=True, exist_ok=True)
+
+    # Flatten parameters (nested dict -> dot notation)
+    flat_parameters = _flatten_parameters(parameters)
+
+    # Generate all parameter combinations
+    param_names = list(flat_parameters.keys())
+    param_values = list(flat_parameters.values())
+    combinations = list(itertools.product(*param_values))
+
+    # Generate configuration files using load_and_update_config
+    for i, combination in enumerate(combinations):
+        # Create parameter dictionary for this combination
+        param_dict = dict(zip(param_names, combination))
+
+        # Use load_and_update_config to get the updated configuration
+        config = load_and_update_config(
+            reference_filepath=base_config_path, parameters=param_dict
+        )
 
         # Save configuration with sequential filename
         output_filename = f"config_{i:04d}.yaml"
@@ -373,3 +480,62 @@ def run_configs(
     logger.info(f"\nResults saved to: {results_dir}")
 
     return summary
+
+
+def set_nested_param(config_dict, param_path, value):
+    """
+    Set a parameter in a nested dictionary using dot notation.
+    Raises an error if the parameter path doesn't exist.
+
+    Parameters
+    ----------
+    config_dict : dict
+        Configuration dictionary to modify
+    param_path : str
+        Parameter path in dot notation (e.g., 'model_parameters.pulse_param_a')
+    value : any
+        Value to set
+
+    Example
+    -------
+    set_nested_param(config, 'model_parameters.pulse_param_a', 0.05)
+    set_nested_param(config, 'geometry.target_latitude', 42.0)
+
+    Raises
+    ------
+    KeyError
+        If any part of the parameter path doesn't exist in the config
+    """
+    keys = param_path.split(".")
+    current = config_dict
+
+    # First, verify the entire path exists
+    path_check = config_dict
+    for i, key in enumerate(keys[:-1]):
+        if key not in path_check:
+            partial_path = ".".join(keys[: i + 1])
+            raise KeyError(
+                f"Parameter path '{param_path}' not found. Missing key '{key}' in path '{partial_path}'"
+            )
+        if not isinstance(path_check[key], dict):
+            partial_path = ".".join(keys[: i + 1])
+            raise KeyError(
+                f"Parameter path '{param_path}' invalid. '{partial_path}' is not a dictionary"
+            )
+        path_check = path_check[key]
+
+    # Check if the final key exists
+    final_key = keys[-1]
+    if final_key not in path_check:
+        raise KeyError(
+            f"Parameter '{final_key}' not found in '{'.'.join(keys[:-1])}'. Available keys: {list(path_check.keys())}"
+        )
+
+    # Now navigate and set the value (we know the path is valid)
+    for key in keys[:-1]:
+        current = current[key]
+
+    # Set the final value
+    current[keys[-1]] = float(
+        value
+    )  # Convert to float to avoid numpy serialization issues
