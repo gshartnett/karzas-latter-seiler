@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.INFO)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import yaml
+import yaml  # type: ignore
 
 from emp.calibration import (
     calibrate_pulse_params,
@@ -32,19 +32,20 @@ print("\nRunning initial model simulation...")
 
 # Instantiate the model and run
 model = EmpModel.from_yaml("configs/StarfishPrime_benchmark.yaml")
-result = model.run()
+initial_result = model.run()
 
 # Find peak characteristics for both simulated and reference data
 t_peak_sim, E_peak_sim = find_peak_characteristics(
-    time_points=result.time_points, Efield_points=result.E_norm_at_ground
+    time_points=initial_result.time_points,
+    Efield_points=initial_result.E_norm_at_ground,
 )
 t_peak_ref, E_peak_ref = find_peak_characteristics(
     time_points=time_values, Efield_points=Efield_values
 )
 
 print(f"Initial simulation completed:")
-print(f"  Maximum field strength: {result.get_max_field_magnitude():.2e} V/m")
-print(f"  Time of maximum field: {result.get_max_field_time():.2f} ns")
+print(f"  Maximum field strength: {initial_result.get_max_field_magnitude():.2e} V/m")
+print(f"  Time of maximum field: {initial_result.get_max_field_time():.2f} ns")
 print(f"  Peak time (simulation): {t_peak_sim:.2f} ns")
 print(f"  Peak amplitude (simulation): {E_peak_sim:.2e} V/m")
 print(f"  Peak time (reference): {t_peak_ref:.2f} ns")
@@ -59,8 +60,8 @@ print(f"  Initial amplitude relative error: {amplitude_rel_error:.4f}")
 # Create initial comparison plot
 fig, ax = plt.subplots(1, figsize=(7, 5))
 ax.plot(
-    result.time_points,
-    result.E_norm_at_ground,
+    initial_result.time_points,
+    initial_result.E_norm_at_ground,
     "-",
     color="k",
     linewidth=1.5,
@@ -95,7 +96,7 @@ print("Starting parameter calibration...")
 parameters_to_optimize = [
     "model_parameters.pulse_param_a",
     "model_parameters.pulse_param_b",
-    "joint_latitude_deg",
+    # "joint_latitude_deg",
 ]
 print(f"Parameters to optimize: {parameters_to_optimize}")
 
@@ -104,7 +105,7 @@ optimal_params = calibrate_pulse_params(
     ref_time_peak=t_peak_ref,
     ref_amplitude_peak=E_peak_ref,
     parameters_to_optimize=parameters_to_optimize,
-    initial_guess=[0.01, 0.37, 30.0],  # Added third parameter for joint_latitude_deg
+    initial_guess=[0.01, 0.37],
     reference_filepath="configs/StarfishPrime_benchmark.yaml",
     max_evaluations=10,
 )
@@ -168,6 +169,14 @@ print(f"  Amplitude error: {amplitude_rel_error:.4f} → {amplitude_rel_error_fi
 
 # Create final comparison plot
 fig, ax = plt.subplots(1, figsize=(7, 5))
+ax.plot(
+    initial_result.time_points,
+    initial_result.E_norm_at_ground,
+    "--",
+    color="gray",
+    linewidth=1.5,
+    label="Initial simulation",
+)
 ax.plot(
     result.time_points,
     result.E_norm_at_ground,

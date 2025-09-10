@@ -1,4 +1,4 @@
-import json
+import logging
 import os
 import tempfile
 from typing import (
@@ -8,13 +8,7 @@ from typing import (
 )
 
 import numpy as np
-import pandas as pd
 import yaml  # type: ignore
-from numpy.typing import NDArray
-from scipy.integrate import (
-    quad,
-    solve_ivp,
-)
 from scipy.interpolate import (
     CubicSpline,
     interp1d,
@@ -36,7 +30,7 @@ def calibrate_pulse_params(
     reference_filepath: str,
     bounds: Optional[List[Tuple]] = None,
     max_evaluations: int = 5,
-):
+) -> np.ndarray:
     """
     Calibrate model parameters by minimizing difference between simulated and reference peak characteristics.
 
@@ -67,7 +61,7 @@ def calibrate_pulse_params(
         Optimized parameter values (same order as parameters_to_optimize)
     """
 
-    def objective_function(params):
+    def objective_function(params: List[float]) -> float:
         # Convert parameter lists to dictionary for new interface
         parameters_dict = dict(zip(parameters_to_optimize, params))
 
@@ -123,13 +117,13 @@ def calibrate_pulse_params(
         )
 
     if result.success:
-        print(f"Optimization successful - Final objective: {result.fun:.6e}")
+        logging.info(f"Optimization successful - Final objective: {result.fun:.6e}")
     else:
-        print(f"Optimization failed: {result.message}")
+        logging.warning(f"Optimization failed: {result.message}")
 
-    print("Optimized parameters:")
+    logging.info("Optimized parameters:")
     for param_name, value in zip(parameters_to_optimize, result.x):
-        print(f"  {param_name}: {value:.6f}")
+        logging.info(f"  {param_name}: {value:.6f}")
 
     return result.x
 
