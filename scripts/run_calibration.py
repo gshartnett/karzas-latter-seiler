@@ -79,6 +79,7 @@ ax.scatter(t_peak_ref, E_peak_ref, color="r", s=50, label="Ref peak")
 
 ax.set_xlabel(r"$\tau$ [ns]")
 ax.set_ylabel(r"E [V/m]")
+ax.set_yscale("log")
 plt.minorticks_on()
 plt.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 plt.grid(alpha=0.5)
@@ -105,9 +106,9 @@ optimal_params = calibrate_pulse_params(
     ref_time_peak=t_peak_ref,
     ref_amplitude_peak=E_peak_ref,
     parameters_to_optimize=parameters_to_optimize,
-    initial_guess=[0.01, 0.37],
+    initial_guess=[model.pulse_param_a, model.pulse_param_b],
     reference_filepath="configs/StarfishPrime_benchmark.yaml",
-    max_evaluations=10,
+    max_evaluations=20,
 )
 
 print(f"Calibration completed. Optimal parameters:")
