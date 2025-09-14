@@ -334,7 +334,7 @@ def _save_map_as_image(geomap: folium.Map, save_path: str) -> None:
 
 def compute_horizon_bbox(
     burst_point: Point,
-    safety_margin: float = 1.05,
+    safety_margin: float = 1.0,
 ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
     """
     Compute a latitude/longitude bounding box that contains the
