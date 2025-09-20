@@ -20,7 +20,7 @@ from emp.model import EmpModel
 print("Loading reference data and running initial simulation...")
 
 # Load the Longmire data
-df = pd.read_csv("Longmire_data_StarfishPrime.csv", header=None, names=["x", "y"])
+df = pd.read_csv("Digitized Data/Longmire/StarfishPrime_CHAP_curve.csv", header=None, names=["x", "y"])
 time_values = df["x"]
 Efield_values = df["y"]
 print(f"Loaded Longmire reference data: {len(time_values)} data points")
@@ -79,7 +79,6 @@ ax.scatter(t_peak_ref, E_peak_ref, color="r", s=50, label="Ref peak")
 
 ax.set_xlabel(r"$\tau$ [ns]")
 ax.set_ylabel(r"E [V/m]")
-ax.set_yscale("log")
 plt.minorticks_on()
 plt.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 plt.grid(alpha=0.5)
