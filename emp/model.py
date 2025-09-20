@@ -373,6 +373,23 @@ class EmpModel:
         )
         self.Bnorm = self.magnetic_field.get_field_magnitude(self.midway_point)
 
+    @property
+    def time_of_peak_pulse(self) -> float:
+        """
+        Time of peak of the pulse function f_pulse(t), in ns.
+
+        Calculated analytically from the pulse parameters.
+
+        Returns
+        -------
+        float
+            Time of peak, in ns.
+        """
+        return float(
+            np.log(self.pulse_param_b / self.pulse_param_a)
+            / (self.pulse_param_b - self.pulse_param_a)
+        )
+
     def RCompton(self, r: float) -> float:
         """
         The Compton electron stopping distance.

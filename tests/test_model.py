@@ -8,6 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 from scipy.integrate._ivp.ivp import OdeResult
+from scipy.interpolate import interp1d
+from scipy.optimize import minimize_scalar
 
 from emp.constants import (
     DEFAULT_NUM_TIME_POINTS,
@@ -449,6 +451,36 @@ class TestEMPMODEL:
         model_igrf = EmpModel(burst_point, target_point, magnetic_field_model="igrf")
         assert model_igrf.Bnorm > 0
         assert 0 <= model_igrf.theta <= np.pi
+
+    def test_time_to_peak_pulse(self, default_points: tuple[Point, Point]) -> None:
+        """
+        Test the time-to-peak pulse of the model.
+
+        Parameters
+        ----------
+        default_points : tuple[Point, Point]
+            The burst and target points for the model.
+        """
+        # Instantiate a model, burst and target points are irrelevant here
+        burst_point, target_point = default_points
+        model = EmpModel(burst_point, target_point)
+
+        # Retrieve the time to peak of the pulse from the model property
+        time_to_peak_pulse_expected = model.time_of_peak_pulse
+
+        # Calculate the time to peak of the pulse using numerical methods
+        time_points = np.linspace(0, 100, 500)
+        pulse_values = model.f_pulse(time_points)
+        interp = interp1d(time_points, pulse_values, kind="cubic")
+        res = minimize_scalar(
+            lambda t: -interp(t),
+            bounds=(time_points.min(), time_points.max()),
+            method="bounded",
+        )
+        time_to_peak_pulse_computed = res.x
+        assert np.isclose(
+            time_to_peak_pulse_computed, time_to_peak_pulse_expected, rtol=1e-6
+        )
 
 
 def test_rho_divided_by_rho0_at_burst_point() -> None:
