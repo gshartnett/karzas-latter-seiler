@@ -20,7 +20,11 @@ from emp.model import EmpModel
 print("Loading reference data and running initial simulation...")
 
 # Load the Longmire data
-df = pd.read_csv("Digitized Data/Longmire/StarfishPrime_CHAP_curve.csv", header=None, names=["x", "y"])
+df = pd.read_csv(
+    "Digitized Data/Longmire/StarfishPrime_CHAP_curve.csv",
+    header=None,
+    names=["x", "y"],
+)
 time_values = df["x"]
 Efield_values = df["y"]
 print(f"Loaded Longmire reference data: {len(time_values)} data points")
@@ -96,6 +100,7 @@ print("Starting parameter calibration...")
 parameters_to_optimize = [
     "model_parameters.pulse_param_a",
     "model_parameters.pulse_param_b",
+    "Compton_KE",
     # "joint_latitude_deg",
 ]
 print(f"Parameters to optimize: {parameters_to_optimize}")
@@ -105,7 +110,7 @@ optimal_params = calibrate_pulse_params(
     ref_time_peak=t_peak_ref,
     ref_amplitude_peak=E_peak_ref,
     parameters_to_optimize=parameters_to_optimize,
-    initial_guess=[model.pulse_param_a, model.pulse_param_b],
+    initial_guess=[model.pulse_param_a, model.pulse_param_b, model.Compton_KE],
     reference_filepath="configs/StarfishPrime_benchmark.yaml",
     max_evaluations=20,
 )

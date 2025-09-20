@@ -61,6 +61,14 @@ def calibrate_pulse_params(
         Optimized parameter values (same order as parameters_to_optimize)
     """
 
+    # Check that the lengths of parameters_to_optimize and initial_guess match
+    if len(parameters_to_optimize) != len(initial_guess):
+        raise ValueError(
+            "Length of parameters_to_optimize must match length of initial_guess"
+        )
+    if bounds is not None and len(bounds) != len(parameters_to_optimize):
+        raise ValueError("Length of bounds must match length of parameters_to_optimize")
+
     def objective_function(params: List[float]) -> float:
         # Convert parameter lists to dictionary for new interface
         parameters_dict = dict(zip(parameters_to_optimize, params))
